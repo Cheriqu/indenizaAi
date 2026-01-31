@@ -1,0 +1,597 @@
+/* ===================================
+   ANIMAÇÕES CSS - IndenizaAi Landing Page
+   =================================== */
+
+/* Smooth scroll global */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 1. ANIMAÇÃO DE FLUTUAÇÃO DO BACKGROUND */
+@keyframes float {
+  0%, 100% { 
+    transform: translate(0, 0) scale(1); 
+  }
+  33% { 
+    transform: translate(30px, -30px) scale(1.1); 
+  }
+  66% { 
+    transform: translate(-20px, 20px) scale(0.9); 
+  }
+}
+
+.hero-background {
+  position: fixed;
+  top: -10%;
+  left: -10%;
+  width: 120%;
+  height: 120%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(28, 128, 178, 0.15) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 20%, rgba(163, 200, 82, 0.1) 0%, transparent 50%),
+              radial-gradient(ellipse at 20% 80%, rgba(28, 128, 178, 0.08) 0%, transparent 50%);
+  animation: float 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* 2. FADE IN DOWN (Logo) */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.logo-animation {
+  animation: fadeInDown 0.8s ease-out;
+}
+
+/* 3. FADE IN UP (Conteúdo Hero) */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-content-animation {
+  animation: fadeInUp 1s ease-out 0.2s both;
+}
+
+/* 4. SCALE IN (Form Card) */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.form-card {
+  animation: scaleIn 1s ease-out 0.3s both;
+  position: relative;
+}
+
+.form-card::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(
+    135deg,
+    rgba(28, 128, 178, 0.3),
+    rgba(163, 200, 82, 0.2),
+    rgba(28, 128, 178, 0.3)
+  );
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+  filter: blur(10px);
+}
+
+.form-card:hover::before {
+  opacity: 0.5;
+}
+
+/* 5. HOVER - ELEVAÇÃO DE CARDS (Steps) */
+.step {
+  transition: all 0.3s ease;
+}
+
+.step:hover {
+  transform: translateY(-8px);
+  border-color: rgba(28, 128, 178, 0.3);
+  box-shadow: 0 12px 40px rgba(28, 128, 178, 0.15);
+}
+
+/* Animação do ícone dentro do step ao hover */
+.step:hover svg {
+  transform: scale(1.1) rotate(5deg);
+  transition: transform 0.3s ease;
+}
+
+.step svg {
+  transition: transform 0.3s ease;
+}
+
+/* HOVER - ELEVAÇÃO DE CARDS (Stats) */
+.stat-item {
+  transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+.stat-item:hover svg {
+  transform: scale(1.1);
+  transition: transform 0.3s ease;
+}
+
+.stat-item svg {
+  transition: transform 0.3s ease;
+}
+
+/* HOVER - ELEVAÇÃO DE CARDS (Problem Cards) */
+.problem-card {
+  transition: all 0.3s ease;
+}
+
+.problem-card:hover {
+  border-color: rgba(28, 128, 178, 0.3);
+  box-shadow: 0 8px 30px rgba(28, 128, 178, 0.12);
+  transform: translateY(-4px);
+}
+
+.problem-card:hover svg {
+  transform: scale(1.1);
+  transition: transform 0.3s ease;
+}
+
+.problem-card svg {
+  transition: transform 0.3s ease;
+}
+
+/* 6. HOVER - BOTÕES */
+.btn-primary {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(28, 128, 178, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  transition: transform 0.1s;
+}
+
+.btn-secondary {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+  transition: transform 0.1s;
+}
+
+/* Efeito de brilho sutil nos botões ao hover */
+.btn-primary::before,
+.btn-secondary::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn-primary:hover::before,
+.btn-secondary:hover::before {
+  width: 300px;
+  height: 300px;
+  opacity: 0;
+}
+
+/* 7. INPUT FOCUS */
+.form-input {
+  transition: all 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #1c80b2;
+  box-shadow: 0 0 0 4px rgba(28, 128, 178, 0.1);
+  background-color: #ffffff;
+}
+
+/* Animação sutil de placeholder */
+.form-input::placeholder {
+  transition: all 0.3s ease;
+  opacity: 0.6;
+}
+
+.form-input:focus::placeholder {
+  opacity: 0.4;
+  transform: translateY(-2px);
+}
+
+/* 8. INTERSECTION OBSERVER (Scroll Animations) */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.animate-on-scroll.animate-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Animações sequenciais para múltiplos elementos */
+.step:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.step:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.step:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.stat-item:nth-child(1) {
+  transition-delay: 0s;
+}
+
+.stat-item:nth-child(2) {
+  transition-delay: 0.1s;
+}
+
+.stat-item:nth-child(3) {
+  transition-delay: 0.2s;
+}
+
+.problem-card:nth-child(1) {
+  transition-delay: 0s;
+}
+
+.problem-card:nth-child(2) {
+  transition-delay: 0.1s;
+}
+
+.problem-card:nth-child(3) {
+  transition-delay: 0.2s;
+}
+
+.problem-card:nth-child(4) {
+  transition-delay: 0.3s;
+}
+
+/* 9. OTIMIZAÇÃO GPU */
+.hero-background,
+.form-card,
+.step,
+.stat-item,
+.problem-card,
+.btn-primary,
+.btn-secondary {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Remover will-change após animação para economia de recursos */
+.animate-visible {
+  will-change: auto;
+}
+
+/* 10. ANIMAÇÃO DE PULSE PARA LOADING */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* 11. ANIMAÇÃO SUTIL DE BRILHO NO CARD DE SUCESSO */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.success-card-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 3s infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* 12. GRADIENTE ANIMADO SUTIL NO TÍTULO (OPCIONAL) */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.gradient-text {
+  background: linear-gradient(
+    90deg,
+    #1c80b2,
+    #2a9dd0,
+    #1c80b2
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* 13. ANIMAÇÃO DE BOUNCE PARA ESTRELAS */
+@keyframes star-bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.star-rating svg {
+  animation: star-bounce 0.5s ease;
+}
+
+.star-rating svg:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.star-rating svg:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.star-rating svg:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.star-rating svg:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.star-rating svg:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+/* CSS personalizado adicional */
+.css-ew64yg {
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.css-4hzbpn {
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.css-vsca90 {
+  display: flex;
+}
+
+/* RESPONSIVO - Reduzir animações em telas pequenas */
+@media (max-width: 768px) {
+  .hero-background {
+    animation-duration: 30s;
+  }
+  
+  .step:hover,
+  .stat-item:hover,
+  .problem-card:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* TRANSIÇÕES SUAVES GLOBAIS */
+button,
+a {
+  transition: all 0.2s ease;
+}
+
+/* FOCUS STATES */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #1c80b2;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 14. ANIMAÇÃO DAS LINHAS DECORATIVAS */
+@keyframes wave-flow {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(-10px) translateY(-3px);
+  }
+  50% {
+    transform: translateX(-20px) translateY(-5px);
+  }
+  75% {
+    transform: translateX(-10px) translateY(-3px);
+  }
+}
+
+@keyframes wave-flow-reverse {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(10px) translateY(3px);
+  }
+  50% {
+    transform: translateX(20px) translateY(5px);
+  }
+  75% {
+    transform: translateX(10px) translateY(3px);
+  }
+}
+
+@keyframes wave-flow-slow {
+  0%, 100% {
+    transform: translateX(0) translateY(0);
+  }
+  33% {
+    transform: translateX(-8px) translateY(2px);
+  }
+  66% {
+    transform: translateX(8px) translateY(-2px);
+  }
+}
+
+.animated-lines {
+  opacity: 0.5;
+  position: relative;
+}
+
+.animated-lines svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.animated-lines svg g {
+  overflow: visible !important;
+}
+
+.animated-lines path:nth-child(1) {
+  animation: wave-flow 10s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.animated-lines path:nth-child(2) {
+  animation: wave-flow-reverse 12s ease-in-out infinite;
+  transform-origin: center;
+  animation-delay: 1s;
+}
+
+.animated-lines path:nth-child(3) {
+  animation: wave-flow-slow 14s ease-in-out infinite;
+  transform-origin: center;
+  animation-delay: 2s;
+}
+
+.animated-lines path:nth-child(4) {
+  animation: wave-flow 11s ease-in-out infinite;
+  transform-origin: center;
+  animation-delay: 0.5s;
+}
+
+.animated-lines path:nth-child(5) {
+  animation: wave-flow-reverse 13s ease-in-out infinite;
+  transform-origin: center;
+  animation-delay: 1.5s;
+}
+
+/* 15. ESTILOS DO CARROSSEL DE DEPOIMENTOS */
+.success-cases-slider {
+  margin: 0 auto;
+}
+
+.success-cases-slider .slick-dots {
+  display: none !important;
+}
+
+.success-cases-slider .slick-list {
+  overflow: hidden;
+}
+
+.success-cases-slider .slick-track {
+  display: flex;
+  align-items: stretch;
+}
+
+.success-cases-slider .slick-slide {
+  height: auto;
+}
+
+.success-cases-slider .slick-slide > div {
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  .success-cases-slider {
+    padding: 0;
+  }
+}
+
+/* ACESSIBILIDADE - Respeitar preferências de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .hero-background {
+    animation: none;
+  }
+  
+  .animated-lines svg,
+  .animated-lines path {
+    animation: none !important;
+  }
+  
+  html {
+    scroll-behavior: auto;
+  }
+}
