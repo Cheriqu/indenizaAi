@@ -439,10 +439,7 @@ export default function App() {
           <img src={wavesBackground} alt="" className="w-full h-full object-contain scale-150 origin-top" />
         </div>
 
-        {/* Background Waves - BOTTOM */}
-        <div className="absolute bottom-0 left-0 w-full h-[800px] pointer-events-none overflow-hidden mix-blend-multiply opacity-40 rotate-180 z-0">
-          <img src={wavesBackground} alt="" className="w-full h-full object-contain scale-150 origin-top" />
-        </div>
+
 
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 relative z-10">
 
