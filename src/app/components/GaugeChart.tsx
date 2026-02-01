@@ -20,15 +20,15 @@ const GaugeChart = ({ percentage }: { percentage: number }) => {
         label = "BAIXA";
     }
 
-    const radius = 50;
-    const stroke = 8;
+    const radius = 70;
+    const stroke = 10;
     const normalizedRadius = radius - stroke * 2;
     const circumference = normalizedRadius * 2 * Math.PI;
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
     return (
         <div className="flex flex-col items-center justify-center gap-2">
-            <div className="relative flex items-center justify-center w-32 h-32">
+            <div className="relative flex items-center justify-center w-44 h-44">
                 <svg height={radius * 2} width={radius * 2} className="rotate-[-90deg]">
                     <circle
                         stroke="#e2e8f0"
@@ -51,8 +51,8 @@ const GaugeChart = ({ percentage }: { percentage: number }) => {
                     />
                 </svg>
                 <div className="absolute flex flex-col items-center">
-                    <span className="text-3xl filter drop-shadow-sm">{emoji}</span>
-                    <span className="text-xl font-bold" style={{ color: color }}>{percentage.toFixed(0)}%</span>
+                    <span className="text-4xl filter drop-shadow-sm">{emoji}</span>
+                    <span className="text-2xl font-bold" style={{ color: color }}>{percentage.toFixed(0)}%</span>
                 </div>
             </div>
             <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">

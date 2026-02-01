@@ -221,9 +221,9 @@ def criar_pdf_bytes(dados_analise, nome_cliente):
     styleResultGray = ParagraphStyle('Gray', parent=styles['Normal'], fontSize=10, textColor=colors.gray, fontName="Helvetica-Bold")
 
     # 1. Logo TOPO
-    logo_path = ASSETS_DIR / "LOGO.png"
+    logo_path = ASSETS_DIR / "logo.png"
     if not logo_path.exists():
-        logo_path = Path("/var/www/indeniza/frontend/dist/assets/LOGO.png")
+        logo_path = Path("/var/www/indeniza/dist/assets/logo.png")
     
     if logo_path.exists():
         try:
@@ -369,13 +369,16 @@ def analisar_caso(request: AnaliseRequest):
     # Lista de modelos gratuitos para tentar (ordem de prioridade)
     # Lista de modelos gratuitos e VALIDADOS (ordem de prioridade)
     free_models = [
+        "tngtech/deepseek-r1t2-chimera:free", # Novo (User request)
+        "z-ai/glm-4.5-air:free",             # Novo (User request)
+        "tngtech/deepseek-r1t-chimera:free", # Novo (User request)
         "meta-llama/llama-3.3-70b-instruct:free", # Llama 3.3 (Muito bom)
-        "google/gemini-2.0-flash-exp:free",      # Gemini V2 (Rápido, mas pode dar rate limit)
-        "nousresearch/hermes-3-llama-3.1-405b:free", # Hermes 405B (Excelente inteligência)
+        "google/gemini-2.0-flash-exp:free",      # Gemini V2 (Rápido)
+        "nousresearch/hermes-3-llama-3.1-405b:free", # Hermes 405B
         "mistralai/mistral-small-3.1-24b-instruct:free", 
         "qwen/qwen-2.5-vl-7b-instruct:free",
-        "liquid/lfm-2.5-1.2b-instruct:free",     # Leve e rápido
-        "meta-llama/llama-3.2-3b-instruct:free"  # Backup final
+        "liquid/lfm-2.5-1.2b-instruct:free",
+        "meta-llama/llama-3.2-3b-instruct:free"
     ]
 
     resp = None

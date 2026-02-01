@@ -29,8 +29,8 @@ import {
   ChevronRight,
   History
 } from "lucide-react";
-import logoImage from "@/assets/c3408d4161476395e88288123c87a1241a5f5659.png";
-import wavesBackground from "@/assets/9d56a886baf09f279c52089b93b3f337ec4082fb.png";
+import logoImage from "@/assets/logo.png";
+import wavesBackground from "@/assets/background-waves.png";
 import AnimatedCounter from "@/app/components/AnimatedCounter";
 import { SuccessCases } from "@/app/components/SuccessCases";
 import "@/styles/animations.css";
@@ -40,7 +40,7 @@ import GaugeChart from "@/app/components/GaugeChart";
 import SkeletonResults from "@/app/components/SkeletonResults";
 import Testimonials from "@/app/components/Testimonials";
 import { maskPhone } from "@/utils/maskPhone";
-import { api, loadCities } from "@/services/api";
+import { api, loadStates, loadCitiesByState } from "@/services/api";
 
 export default function App() {
   // STATE: Flow Control
@@ -49,8 +49,10 @@ export default function App() {
 
   // STATE: Input Data
   const [inputValue, setInputValue] = useState("");
-  const [formData, setFormData] = useState({ nome: '', email: '', whatsapp: '', cidade: 'Curitiba', aceitaAdvogado: false });
-  const [listaCidades, setListaCidades] = useState<string[]>(['Curitiba']);
+  const [formData, setFormData] = useState({ nome: '', email: '', whatsapp: '', cidade: '', estado: '', aceitaAdvogado: false });
+  const [listaEstados, setListaEstados] = useState<{ sigla: string, nome: string }[]>([]);
+  const [listaCidades, setListaCidades] = useState<string[]>([]);
+  const [selectedEstado, setSelectedEstado] = useState("");
 
   // STATE: Analysis Data
   const [analiseId, setAnaliseId] = useState('');
@@ -67,12 +69,14 @@ export default function App() {
   // --- USE EFFECTS ---
 
   useEffect(() => {
-    // Initial Load
-    loadCities().then(setListaCidades);
+    // Initial Load - States
+    loadStates().then(setListaEstados);
+
+    // History
     const hist = JSON.parse(localStorage.getItem('indeniza_historico') || '[]');
     setHistorico(hist);
 
-    // Intersection Observer (From New Design)
+    // Intersection Observer
     const observerOptions = { threshold: 0.1, rootMargin: "0px 0px -50px 0px" };
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
@@ -85,6 +89,16 @@ export default function App() {
     document.querySelectorAll(".animate-on-scroll").forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
+
+  // Load Cities when State changes
+  useEffect(() => {
+    if (selectedEstado) {
+      loadCitiesByState(selectedEstado).then(setListaCidades);
+      setFormData(prev => ({ ...prev, estado: selectedEstado, cidade: '' })); // Reset city
+    } else {
+      setListaCidades([]);
+    }
+  }, [selectedEstado]);
 
   // Save History
   useEffect(() => {
@@ -276,12 +290,33 @@ export default function App() {
           <input placeholder="Nome Completo" className="form-input border border-gray-300 p-3 rounded-xl w-full focus:ring-2 focus:ring-[#8ab03d] outline-none" onChange={e => setFormData({ ...formData, nome: e.target.value })} />
           <input placeholder="E-mail" className="form-input border border-gray-300 p-3 rounded-xl w-full focus:ring-2 focus:ring-[#8ab03d] outline-none" onChange={e => setFormData({ ...formData, email: e.target.value })} />
           <input placeholder="WhatsApp / Celular" value={formData.whatsapp} maxLength={15} className="form-input border border-gray-300 p-3 rounded-xl w-full focus:ring-2 focus:ring-[#8ab03d] outline-none" onChange={e => setFormData({ ...formData, whatsapp: maskPhone(e.target.value) })} />
-
-          <div className="relative">
-            <MapPin className="absolute left-3 top-3.5 text-gray-400 size-4" />
-            <select className="border border-gray-300 p-3 pl-10 rounded-xl w-full outline-none focus:ring-2 focus:ring-[#8ab03d] bg-white text-gray-700 appearance-none" value={formData.cidade} onChange={e => setFormData({ ...formData, cidade: e.target.value })}>
-              {listaCidades.map((c, i) => <option key={i} value={c}>{c}</option>)}
-            </select>
+          <div className="relative flex gap-2">
+            <div className="w-1/3">
+              <select
+                className="border border-gray-300 p-3 rounded-xl w-full outline-none focus:ring-2 focus:ring-[#8ab03d] bg-white text-gray-700 appearance-none"
+                value={selectedEstado}
+                onChange={e => setSelectedEstado(e.target.value)}
+              >
+                <option value="">UF</option>
+                {listaEstados.map((e) => <option key={e.sigla} value={e.sigla}>{e.sigla}</option>)}
+              </select>
+            </div>
+            <div className="w-2/3 relative">
+              <input
+                list="cities-list"
+                placeholder={selectedEstado ? "Digite a cidade..." : "Selecione o estado"}
+                className="border border-gray-300 p-3 rounded-xl w-full outline-none focus:ring-2 focus:ring-[#8ab03d] disabled:bg-gray-100"
+                value={formData.cidade.split(' - ')[0]} // Show only city name part
+                disabled={!selectedEstado}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({ ...formData, cidade: `${val} - ${selectedEstado}` });
+                }}
+              />
+              <datalist id="cities-list">
+                {listaCidades.map((c, i) => <option key={i} value={c} />)}
+              </datalist>
+            </div>
           </div>
 
           <label className="flex items-start gap-3 cursor-pointer bg-gray-50 p-3 rounded-lg border border-gray-100">
@@ -399,9 +434,14 @@ export default function App() {
 
       {/* CONTENT AREA */}
       <section className="relative min-h-[80vh]">
-        {/* Background Waves */}
-        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden mix-blend-multiply opacity-50">
-          <img src={wavesBackground} alt="" className="w-full h-full object-cover" />
+        {/* Background Waves - TOP */}
+        <div className="absolute top-0 left-0 w-full h-[800px] pointer-events-none overflow-hidden mix-blend-multiply opacity-40 -mt-32">
+          <img src={wavesBackground} alt="" className="w-full h-full object-contain scale-150 origin-top" />
+        </div>
+
+        {/* Background Waves - BOTTOM */}
+        <div className="absolute bottom-0 left-0 w-full h-[800px] pointer-events-none overflow-hidden mix-blend-multiply opacity-40 rotate-180 z-0">
+          <img src={wavesBackground} alt="" className="w-full h-full object-contain scale-150 origin-top" />
         </div>
 
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 relative z-10">
@@ -432,38 +472,38 @@ export default function App() {
 
         {/* REST OF LANDING PAGE (Only visible in INPUT step) */}
         {step === 'INPUT' && (
-          <div className="animate-in fade-in duration-1000">
+          <div className="animate-in fade-in duration-1000 relative z-10">
             {/* How It Works */}
-            <div className="max-w-4xl mx-auto pt-8 pb-32 px-4 md:px-8 relative z-10 animate-on-scroll">
+            <div className="max-w-4xl mx-auto pt-8 pb-32 px-4 md:px-8 relative animate-on-scroll">
               <h2 className="text-2xl md:text-3xl font-bold text-[#0f172a] text-center mb-10 font-archivo">
                 Como funciona?
               </h2>
               <div className="grid md:grid-cols-3 gap-6">
-                <div className="step bg-white rounded-2xl p-6 shadow-md transition-all duration-300 hover:shadow-lg">
-                  <div className="bg-[#E8F4F8] w-14 h-14 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                <div className="step bg-white rounded-2xl p-6 shadow-md transition-all duration-300 hover:shadow-lg flex flex-col items-center">
+                  <div className="bg-[#E8F4F8] w-14 h-14 rounded-xl flex items-center justify-center mb-4">
                     <FileText className="w-6 h-6 text-[#1C80B2]" />
                   </div>
-                  <div className="bg-[#E8F4F8] inline-block px-3 py-1 rounded-full mb-3 mx-auto block text-center">
+                  <div className="bg-[#E8F4F8] px-3 py-1 rounded-full mb-3 text-center">
                     <span className="text-sm font-bold text-[#1c80b2]">1. Relate</span>
                   </div>
                   <p className="text-sm text-[#64748b] text-center leading-relaxed">Descreva o que aconteceu com você</p>
                 </div>
 
-                <div className="step bg-white rounded-2xl p-6 shadow-md transition-all duration-300 hover:shadow-lg">
-                  <div className="bg-[#1c80b2] w-14 h-14 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                <div className="step bg-white rounded-2xl p-6 shadow-md transition-all duration-300 hover:shadow-lg flex flex-col items-center">
+                  <div className="bg-[#1c80b2] w-14 h-14 rounded-xl flex items-center justify-center mb-4">
                     <Zap className="w-6 h-6 text-white" />
                   </div>
-                  <div className="bg-[#E8F4F8] inline-block px-3 py-1 rounded-full mb-3 mx-auto block text-center">
+                  <div className="bg-[#E8F4F8] px-3 py-1 rounded-full mb-3 text-center">
                     <span className="text-sm font-bold text-[#1c80b2]">2. IA Analisa</span>
                   </div>
                   <p className="text-sm text-[#64748b] text-center leading-relaxed">Busca em milhares de casos reais</p>
                 </div>
 
-                <div className="step bg-white rounded-2xl p-6 shadow-md transition-all duration-300 hover:shadow-lg">
-                  <div className="bg-[#D8ECC4] w-14 h-14 rounded-xl flex items-center justify-center mb-4 mx-auto">
+                <div className="step bg-white rounded-2xl p-6 shadow-md transition-all duration-300 hover:shadow-lg flex flex-col items-center">
+                  <div className="bg-[#D8ECC4] w-14 h-14 rounded-xl flex items-center justify-center mb-4">
                     <Smile className="w-6 h-6 text-[#8AB03D]" />
                   </div>
-                  <div className="bg-[#D8ECC4] inline-block px-3 py-1 rounded-full mb-3 mx-auto block text-center">
+                  <div className="bg-[#D8ECC4] px-3 py-1 rounded-full mb-3 text-center">
                     <span className="text-sm font-bold text-[#8ab03d]">3. Resultado</span>
                   </div>
                   <p className="text-sm text-[#64748b] text-center leading-relaxed">Veja probabilidade e valor estimado</p>

@@ -43,13 +43,24 @@ export const api = {
     }
 };
 
-export const loadCities = async () => {
+export const loadStates = async () => {
     try {
-        const r = await fetch('/municipios.txt');
-        const text = await r.text();
-        return text.split(',').map(c => c.trim()).sort();
-    } catch (e) {
-        console.error("Erro ao carregar cidades", e);
-        return ['Curitiba'];
+        const response = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
+        const data = await response.json();
+        return data.map((uf: any) => ({ sigla: uf.sigla, nome: uf.nome }));
+    } catch (error) {
+        console.error("Erro ao buscar estados", error);
+        return [];
+    }
+};
+
+export const loadCitiesByState = async (uf: string) => {
+    try {
+        const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`);
+        const data = await response.json();
+        return data.map((city: any) => city.nome);
+    } catch (error) {
+        console.error("Erro ao buscar cidades", error);
+        return [];
     }
 };
