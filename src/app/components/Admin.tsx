@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Filter, DollarSign, Users, CheckCircle, Search, FileSpreadsheet, Send, CheckSquare } from 'lucide-react'
+import { Filter, DollarSign, Users, CheckCircle, Search, FileSpreadsheet, Send, CheckSquare, Mail, Phone } from 'lucide-react'
 
 const API_URL = import.meta.env.PROD ? 'https://indenizaapp.com.br/api' : 'http://localhost:8000/api';
 
@@ -203,25 +203,41 @@ export default function Admin() {
                                         {new Date(lead.data_registro + "Z").toLocaleDateString('pt-BR')} <br />
                                         <span className="text-xs">{new Date(lead.data_registro + "Z").toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="font-bold text-gray-900">{lead.nome}</div>
+                                    <td className="p-4">
+                                        <div className="font-bold text-gray-800">{lead.nome || "Visitante (Sem Contato)"}</div>
                                         <div className="text-xs text-gray-500">{lead.cidade}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded w-fit">{lead.email}</span>
-                                            <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded w-fit">{lead.whatsapp}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 max-w-xs">
-                                        <span className="font-bold text-[#1c80b2] text-xs uppercase tracking-wider">{lead.categoria}</span>
-                                        <p className="truncate text-gray-500 mt-1" title={lead.resumo_caso}>{lead.resumo_caso}</p>
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <div className="w-full bg-gray-200 rounded-full h-1.5 max-w-[100px]">
-                                                <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${lead.probabilidade}%` }}></div>
+                                        {lead.resumo_caso && !lead.nome && (
+                                            <div className="mt-1 text-[10px] bg-yellow-50 text-yellow-800 p-1 rounded border border-yellow-100 max-w-[200px] truncate" title={lead.resumo_caso}>
+                                                "{lead.resumo_caso}"
                                             </div>
-                                            <span className="text-xs font-medium">{Math.round(lead.probabilidade)}% Êxito</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex flex-col gap-1">
+                                            {lead.email ? (
+                                                <a href={`mailto:${lead.email}`} className="text-xs text-[#1c80b2] hover:underline flex items-center gap-1">
+                                                    <Mail size={10} /> {lead.email}
+                                                </a>
+                                            ) : <span className="text-xs text-gray-400">-</span>}
+
+                                            {lead.whatsapp ? (
+                                                <a href={`https://wa.me/55${lead.whatsapp.replace(/\D/g, '')}`} target="_blank" className="text-xs text-green-600 hover:underline flex items-center gap-1 font-bold">
+                                                    <Phone size={10} /> {lead.whatsapp}
+                                                </a>
+                                            ) : <span className="text-xs text-gray-400">-</span>}
                                         </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex flex-col gap-2">
+                                            <span className="font-bold text-xs uppercase text-[#1c80b2]">{lead.categoria}</span>
+                                            {lead.resumo_caso && lead.nome && (
+                                                <span className="text-[10px] text-gray-500 truncate max-w-[150px]" title={lead.resumo_caso}>"{lead.resumo_caso}"</span>
+                                            )}
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                                            <div className="bg-[#1c80b2] h-1.5 rounded-full" style={{ width: `${lead.probabilidade}%` }}></div>
+                                        </div>
+                                        <span className="text-[10px] text-gray-500 mt-1 block">{lead.probabilidade.toFixed(0)}% Êxito</span>
                                     </td>
                                     <td className="px-6 py-4 text-right font-medium text-gray-900">
                                         {formatMoney(lead.valor_estimado)}

@@ -496,6 +496,17 @@ def analisar_caso(request: AnaliseRequest):
         "relato": request.relato # Salva relato original para PDF
     }
 
+    # CRITICAL: Salva Lead Parcial (Texto da Queixa) imediatamente
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT INTO leads (resumo_caso, categoria, probabilidade, valor_estimado, id_analise, json_analise) VALUES (?,?,?,?,?,?)",
+                (request.relato, categoria, prob, val, id_analise, json.dumps(ANALISES_CACHE[id_analise], ensure_ascii=False)))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Erro ao salvar lead parcial: {e}")
+
     return {"id_analise": id_analise, "probabilidade": prob, "valor_estimado": val, "categoria": categoria, "n_casos": len(finais), "casos": casos_censurados}
 
 @app.post("/api/pagar")
@@ -507,10 +518,21 @@ def gerar_pagamento(lead: LeadData):
             dados_json = json.dumps(ANALISES_CACHE[lead.id_analise], ensure_ascii=False)
         except: pass
 
+    # Atualiza o lead existente com os dados de contato
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise, json_analise) VALUES (?,?,?,?,?,?,?,?,?,?)",
-              (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise, dados_json))
+    # Verifica se existe antes
+    c.execute("SELECT id FROM leads WHERE id_analise = ?", (lead.id_analise,))
+    exists = c.fetchone()
+    
+    if exists:
+        c.execute("UPDATE leads SET nome=?, email=?, whatsapp=?, cidade=? WHERE id_analise=?",
+                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.id_analise))
+    else:
+        # Fallback caso algo tenha falhado no passo anterior (improvável)
+        c.execute("INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise, json_analise) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise, dados_json))
+    
     conn.commit()
     conn.close()
 
@@ -649,9 +671,10 @@ def obter_relatorio(id_analise: str):
 def listar_leads(auth: AdminAuth):
     if auth.senha != SENHA_ADMIN: raise HTTPException(status_code=401)
     conn = sqlite3.connect(DB_PATH)
-    # Evita trazer json_analise pesado
-    df = pd.read_sql_query("SELECT id, data_registro, nome, email, whatsapp, cidade, categoria, probabilidade, valor_estimado, pagou FROM leads ORDER BY id DESC", conn)
+    # Incluindo resumo_caso para ver o texto da queixa
+    df = pd.read_sql_query("SELECT id, data_registro, nome, email, whatsapp, cidade, categoria, probabilidade, valor_estimado, pagou, resumo_caso FROM leads ORDER BY id DESC", conn)
     conn.close()
+    df = df.fillna("") # Garante que Nones virem strings vazias para o frontend
     return df.to_dict(orient="records")
 
 @app.post("/api/admin/reenviar_email")
