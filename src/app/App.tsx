@@ -435,7 +435,7 @@ export default function App() {
       {/* CONTENT AREA */}
       <section className="relative min-h-[80vh]">
         {/* Background Waves - TOP */}
-        <div className="absolute top-0 left-0 w-full h-[800px] pointer-events-none overflow-hidden mix-blend-multiply opacity-40 -mt-32">
+        <div className="absolute top-0 left-0 w-full h-[800px] pointer-events-none overflow-hidden mix-blend-multiply opacity-40 -mt-56">
           <img src={wavesBackground} alt="" className="w-full h-full object-contain scale-150 origin-top" />
         </div>
 
