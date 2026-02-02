@@ -8,6 +8,7 @@ import json
 import traceback
 import uuid
 import smtplib
+import google.generativeai as genai
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
@@ -361,72 +362,90 @@ def enviar_email_pdf(destinatario, nome, pdf_buffer):
 
 # --- ENDPOINTS ---
 
+# IMPORTS (Add verify imports)
+import google.generativeai as genai
+
+# ... code ...
+
 @app.post("/api/analisar")
 def analisar_caso(request: AnaliseRequest):
-    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENAI_KEY)
-    prompt = """Classifique JSON: {"categoria": "AEREO/NOMESUJO/BANCARIO/LUZ/TELEFONIA/OUTROS", "valido": true/false}. Texto: """ + request.relato[:500]
-
-    # Lista de modelos gratuitos para tentar (ordem de prioridade)
-    # Lista de modelos gratuitos e VALIDADOS (ordem de prioridade)
-    free_models = [
-        "tngtech/deepseek-r1t2-chimera:free", # Novo (User request)
-        "z-ai/glm-4.5-air:free",             # Novo (User request)
-        "tngtech/deepseek-r1t-chimera:free", # Novo (User request)
-        "meta-llama/llama-3.3-70b-instruct:free", # Llama 3.3 (Muito bom)
-        "google/gemini-2.0-flash-exp:free",      # Gemini V2 (Rápido)
-        "nousresearch/hermes-3-llama-3.1-405b:free", # Hermes 405B
-        "mistralai/mistral-small-3.1-24b-instruct:free", 
-        "qwen/qwen-2.5-vl-7b-instruct:free",
-        "liquid/lfm-2.5-1.2b-instruct:free",
-        "meta-llama/llama-3.2-3b-instruct:free"
-    ]
+    # Configuração Inicial
+    GOOGLE_KEY = os.getenv("GOOGLE_API_KEY")
+    genai.configure(api_key=GOOGLE_KEY)
+    
+    # Prompt Otimizado para JSON
+    prompt_text = f"""
+    Analise o seguinte relato e classifique-o em uma das categorias: AEREO, NOMESUJO, BANCARIO, LUZ, TELEFONIA, OUTROS.
+    Verifique se é um relato jurídico válido (textos sem sentido ou muito curtos devem ser invalidados).
+    Responda APENAS um JSON válido no formato: {{"categoria": "...", "valido": true/false}}.
+    
+    Relato: {request.relato[:1000]}
+    """
 
     resp = None
     last_error = None
 
-    for model in free_models:
+    # ESTRATÉGIA 1: Google Gemini (Prioridade 1 - 3.0 Flash)
+    # ESTRATÉGIA 2: Google Gemini (Prioridade 2 - 2.0 Flash)
+    gemini_models = ["gemini-3-flash-preview", "gemini-2.0-flash"]
+    
+    for model_name in gemini_models:
         try:
-            print(f"🔄 Tentando modelo: {model}...")
-            # Timeout aumentado para 45 segundos por tentativa
-            check = client.chat.completions.create(
-                model=model, 
-                messages=[{"role": "user", "content": prompt}], 
-                temperature=0,
-                timeout=45.0 
+            print(f"🔄 Tentando Gemini: {model_name}...")
+            model = genai.GenerativeModel(model_name)
+            # Generation Config força resposta JSON
+            response = model.generate_content(
+                prompt_text,
+                generation_config={"response_mime_type": "application/json"}
             )
-            raw_content = check.choices[0].message.content
-            print(f"🤖 Resposta IA ({model}): {raw_content}") # Log para debug
+            raw_content = response.text
+            print(f"🤖 Resposta Gemini ({model_name}): {raw_content}")
             
-            # Tentativa robusta de extrair JSON via Regex
-            match = re.search(r'\{.*\}', raw_content, re.DOTALL)
-            if match:
-                json_str = match.group(0)
-                resp = json.loads(json_str)
-                break # Sucesso! Sai do loop
-            else:
-                # Se falhar no regex, tenta o próximo modelo? 
-                # Ou assume que o modelo respondeu mal e tenta outro?
-                # Vamos tentar parsear com replace simples como fallback
-                try:
-                    resp = json.loads(raw_content.replace("```json","").replace("```","").strip())
-                    break
-                except:
-                    print(f"⚠️ Falha no parse JSON com modelo {model}")
-                    continue
-
+            resp = json.loads(raw_content)
+            if resp: break # Sucesso
         except Exception as e:
-            print(f"❌ Falha com modelo {model}: {e}")
+            print(f"❌ Falha Gemini {model_name}: {e}")
             last_error = e
             continue
 
+    # ESTRATÉGIA 3: OpenRouter (Fallback se Gemini falhar)
+    if not resp:
+        client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENAI_KEY)
+        openrouter_models = [
+            "tngtech/deepseek-r1t2-chimera:free", 
+            "z-ai/glm-4.5-air:free",
+            "meta-llama/llama-3.3-70b-instruct:free"
+        ]
+        
+        for model in openrouter_models:
+            try:
+                print(f"🔄 Tentando OpenRouter: {model}...")
+                check = client.chat.completions.create(
+                    model=model, 
+                    messages=[{"role": "user", "content": prompt_text + " Responda apenas JSON."}], 
+                    temperature=0.1,
+                    timeout=30.0 
+                )
+                raw_content = check.choices[0].message.content
+                match = re.search(r'\{.*\}', raw_content, re.DOTALL)
+                if match:
+                    resp = json.loads(match.group(0))
+                    break
+            except Exception as e:
+                print(f"❌ Falha OpenRouter {model}: {e}")
+                last_error = e
+                continue
+
+    # SE TUDO FALHAR: Retorna Erro (Sem Mock)
     if not resp:
         print(f"❌ Todas as tentativas de IA falharam. Último erro: {last_error}")
-        return {"erro": "IA indisponível no momento (Tente novamente em breve)"}
+        return {"erro": "IA indisponível no momento. Tente novamente em alguns minutos."}
 
-
-
+    # Processamento do Resultado
     if not resp.get("valido"): raise HTTPException(status_code=400, detail="Relato Inválido ou Curto Demais")
     categoria = resp.get("categoria", "OUTROS")
+    
+    # ... Restante do código de busca vetorial (mantido igual) ...
 
     mapa = {
         "AEREO": (df_aereo, vetores_aereo), "NOMESUJO": (df_nome, vetores_nome),

@@ -27,7 +27,8 @@ import {
   Download,
   ExternalLink,
   ChevronRight,
-  History
+  History,
+  Unlock
 } from "lucide-react";
 import logoImage from "@/assets/logo.png";
 import wavesBackground from "@/assets/background-waves.png";
@@ -99,6 +100,27 @@ export default function App() {
       setListaCidades([]);
     }
   }, [selectedEstado]);
+
+  // TRACKING: Dispara Purchase quando o pagamento é confirmado
+  useEffect(() => {
+    if (step === 'SUCCESS') {
+      // @ts-ignore
+      if (window.fbq) {
+        // @ts-ignore
+        window.fbq('track', 'Purchase', {
+          value: 9.90,
+          currency: 'BRL',
+          content_name: 'Relatório Completo IndenizaAi',
+          content_type: 'product'
+        });
+      }
+      // @ts-ignore
+      if (window.clarity) {
+        // @ts-ignore
+        window.clarity('set', 'conversion', 'purchase');
+      }
+    }
+  }, [step]);
 
   // Save History
   useEffect(() => {
@@ -271,9 +293,22 @@ export default function App() {
     </div>
   );
 
+  const [isAnalysisUnlocked, setIsAnalysisUnlocked] = useState(false); // New State
+
+  // ... (inside renderResult)
+
+  const isFormValid = formData.nome && formData.email && formData.whatsapp && selectedEstado && formData.cidade && formData.aceitaAdvogado;
+
+  const handleUnlockAnalysis = () => {
+    if (!isFormValid) return alert("Por favor, preencha todos os campos para ver o resultado.");
+    setIsAnalysisUnlocked(true);
+    // Opcional: Salvar o lead aqui também se desejar
+  };
+
   const renderResult = () => (
     <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-3xl mx-auto">
-      <div className="bg-green-50 rounded-xl p-4 border border-green-200 mb-6 text-center">
+      {/* Probability Section with Blur */}
+      <div className={`bg-green-50 rounded-xl p-4 border border-green-200 mb-6 text-center transition-all duration-500 ${!isAnalysisUnlocked ? 'blur-md select-none grayscale' : ''}`}>
         <h3 className="text-[#15803d] font-bold uppercase tracking-wider text-xs mb-2">Análise Concluída com Sucesso</h3>
         <GaugeChart percentage={resultData.probabilidade} />
         <p className="text-gray-500 text-xs mt-2">Baseado em {resultData.n_casos} casos similares</p>
@@ -306,7 +341,7 @@ export default function App() {
                 list="cities-list"
                 placeholder={selectedEstado ? "Digite a cidade..." : "Selecione o estado"}
                 className="border border-gray-300 p-3 rounded-xl w-full outline-none focus:ring-2 focus:ring-[#8ab03d] disabled:bg-gray-100"
-                value={formData.cidade.split(' - ')[0]} // Show only city name part
+                value={formData.cidade.split(' - ')[0]}
                 disabled={!selectedEstado}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -326,16 +361,29 @@ export default function App() {
             </span>
           </label>
 
-          <button
-            onClick={handlePayment}
-            disabled={aguardandoPagamento}
-            className={`w-full text-white py-4 rounded-xl font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${aguardandoPagamento ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1c80b2] hover:bg-[#156a92]'}`}
-          >
-            {aguardandoPagamento ? <><Loader2 className="animate-spin" /> Aguardando Pagamento...</> : 'DESBLOQUEAR POR R$ 9,90'}
-          </button>
+          {/* TWO STEP BUTTONS */}
+          {!isAnalysisUnlocked ? (
+            <button
+              onClick={handleUnlockAnalysis}
+              disabled={!isFormValid}
+              className={`w-full text-white py-4 rounded-xl font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${!isFormValid ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#eab308] hover:bg-[#ca9a04]'}`}
+            >
+              <Unlock className="size-5" /> DESBLOQUEAR ANÁLISE
+            </button>
+          ) : (
+            <button
+              onClick={handlePayment}
+              disabled={aguardandoPagamento}
+              className={`w-full text-white py-4 rounded-xl font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${aguardandoPagamento ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#1c80b2] hover:bg-[#156a92] animate-pulse'}`}
+            >
+              {aguardandoPagamento ? <><Loader2 className="animate-spin" /> Aguardando Pagamento...</> : 'DESBLOQUEAR RELATÓRIO COMPLETO POR R$ 9,90'}
+            </button>
+          )}
+
           <p className="text-[10px] text-center text-gray-400">Pagamento único • Ambiente Seguro via Mercado Pago 🔒</p>
         </div>
       </div>
+
 
       <div className="text-center mt-6">
         <button onClick={() => setStep('INPUT')} className="text-[#64748b] text-sm underline hover:text-[#1c80b2]">Fazer nova análise</button>
