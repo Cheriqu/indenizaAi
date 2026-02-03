@@ -1,120 +1,116 @@
 # ⚖️ IndenizaAi
 
-**IndenizaAi** é uma plataforma inteligente que utiliza Inteligência Artificial para analisar casos de danos morais e materiais (como aviação, bancário, telefonia e mais), estimando a probabilidade de êxito e o valor da indenização com base em jurisprudência real do Tribunal de Justiça do Paraná (TJPR).
+**IndenizaAi** é uma plataforma inteligente que utiliza Inteligência Artificial e Jurimetria para democratizar o acesso à justiça. Analisamos relatos de problemas cotidianos (como voos cancelados, golpes digitais, negativação indevida, etc.) comparando-os com milhares de decisões reais dos tribunais brasileiros (TJPR) para estimar a probabilidade de ganho de causa e valores de indenização.
 
-O projeto combina uma **Landing Page de Alta Conversão** (React + Tailwind) com um **Backend Poderoso** (Python/FastAPI + IA) e um **Painel Administrativo** para gestão de leads.
+O projeto combina uma **Landing Page de Alta Conversão** (React + Tailwind) com um **Backend Poderoso** (Python/FastAPI) e um sistema de **RAG (Retrieval-Augmented Generation)** com bases vetoriais segregadas por especialidade.
 
 ---
 
 ## 🚀 Funcionalidades
 
-### 👤 Para o Usuário (Cliente Final)
-- **Análise com IA em 30 segundos**: O usuário relata o problema e a IA consulta bases de dados reais.
-- **Relatório Jurimétrico**: Probabilidade de êxito (Gauge Chart) e estimativa de valor.
-- **Fluxo de Pagamento Integrado**: Integração com Mercado Pago para desbloquear o relatório completo.
-- **Geração de PDF**: Download automático de um relatório detalhado em PDF após o pagamento.
-- **Responsivo e Animado**: Interface moderna, mobile-first, com animações suaves e prova social em tempo real.
+### 👤 Para o Cidadão (Cliente Final)
+- **Diagnóstico Jurídico com IA**: Análise semântica do relato em 30 segundos.
+- **Relatório Completo**:
+  - 🚦 **Probabilidade de Êxito**: Baseada em estatística real de casos similares.
+  - 💰 **Estimativa de Valor**: Média das condenações recentes.
+  - 📜 **Jurisprudência**: Exibição de sentenças análogas (Vencedoras e Perdedoras).
+- **Segurança de Dados**: Blur nos resultados até a confirmação do salvamento do contato.
+- **Transparência**: Páginas dedicadas de "Sobre Nós", "Política de Reembolso" e LGPD.
+- **Fluxo de Pagamento**: Integração nativa com Mercado Pago (Desbloqueio de Relatório PDF).
 
 ### 💼 Para o Administrador (Painel Gerencial)
-- **Dashboard de Métricas**:
-  - Total de Leads vs. Vendas (Taxa de Conversão).
-  - Faturamento Estimado (R$ 9,90 por relatório desbloqueado).
-  - Potencial Jurídico (Soma das causas analisadas).
-- **Lista de Leads**: Acompanhamento detalhado de cada análise (Nome, WhatsApp, Resumo, Probabilidade).
-- **Ações Rápidas**:
-  - ✅ Aprovação Manual de pagamento.
-  - 📧 Reenvio de Relatório por E-mail.
-- **Exportação**: Download da base de leads em CSV.
+- **CRM Integrado**: Gestão completa de leads capturados.
+- **Visão 360º**:
+  - Status dos pagamentos em tempo real.
+  - Conversão de Vendas (Leads vs Pagantes).
+  - Potencial financeiro total das causas analisadas.
+- **Ferramentas de Operação**:
+  - Aprovação manual de pagamentos.
+  - Reenvio de relatórios PDF por e-mail.
+  - Exportação de dados (CSV) para campanhas de marketing.
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## 📚 Categorias Atendidas (Bases de Conhecimento)
 
-### Frontend
-- **React 18** (Vite)
-- **Tailwind CSS** (Estilização e Design System)
-- **Lucide React** (Ícones)
-- **Framer Motion** (Animações - opcional)
-- **React Router Dom** (Navegação)
+A IA do IndenizaAi é treinada em bases jurídicas específicas para garantir alta precisão:
 
-### Backend
-- **Python 3.10+**
-- **FastAPI** (API REST de alta performance)
-- **SQLite** (Banco de dados leve e eficiente)
-- **Sentence Transformers** (IA para busca semântica de jurisprudência)
-- **OpenAI / OpenRouter API** (LLMs para classificação de casos: Llama, Gemini, etc.)
-- **ReportLab** (Geração de PDFs dinâmicos)
-- **Mercado Pago SDK** (Processamento de pagamentos)
+1. **✈️ Aéreo**: Atrasos, cancelamentos, extravio de bagagem.
+2. **💳 Bancário**: Tarifas abusivas, juros indevidos, cartão não solicitado.
+3. **🚫 Nome Sujo**: Negativação indevida (SPC/Serasa), manutenção de cadastro.
+4. **📱 Telefonia**: Cobranças indevidas, alteração unilateral de plano.
+5. **🤳 Fraude Digital**: Golpes do Pix, invasão de conta, engenharia social.
+6. **🏥 Plano de Saúde**: Negativa de cirurgia, home care, medicamentos, reajuste.
+7. **🛍️ E-commerce**: Produto não entregue, defeito, atraso excessivo.
+8. **💡 Serviços Essenciais**: Corte indevido de luz/água, cobrança por estimativa (TOI).
+9. **🏠 Imobiliário**: Atraso na entrega de chaves, vícios construtivos.
+10. **🛡️ Seguradora**: Negativa de cobertura (Auto/Residencial/Vida).
+11. **🎓 Ensino**: Problemas com diploma, cobrança após trancamento.
+12. **🌐 Redes Sociais**: Contas hackeadas, recuperação de perfil.
 
----
-
-## 📂 Estrutura do Projeto
-
-```
-indenizaAi/
-├── backend/                # Código do Servidor Python
-│   ├── api.py             # Aplicação Principal FastAPI
-│   ├── indeniza.db        # Banco de Dados SQLite
-│   └── *.pkl              # Bases de Jurisprudência Vetorizadas
-├── public/                 # Arquivos Estáticos Públicos
-├── src/                    # Código Fonte Frontend
-│   ├── app/
-│   │   ├── components/    # Componentes React (Admin, Gauge, etc.)
-│   │   └── App.tsx        # Página Principal (Home)
-│   ├── services/          # Integração API (api.ts)
-│   ├── styles/            # CSS Modules e Tailwind
-│   └── main.tsx           # Ponto de Entrada / Rotas
-├── index.html              # Entry HTML
-├── package.json            # Dependências Frontend
-└── vite.config.ts          # Configuração Vite
-```
+*(Caso não se encaixe, a categoria "Outros" é acionada)*
 
 ---
 
-## ⚙️ Como Rodar Localmente
+## 🛠️ Stack Tecnológica
 
-### 1. Backend (API)
+### Frontend (SPA)
+- **Core**: React 18 + Vite + TypeScript.
+- **Estilo**: Tailwind CSS 4 + ShadCN/UI concepts + Lucide Icons.
+- **Rotas**: React Router Dom (Home, Sobre, Admin).
+- **Animações**: Framer Motion + CSS Animations (Waves, Fade-ins).
+- **Build**: Otimizado para produção com lazy loading.
+
+### Backend (API REST)
+- **Runtime**: Python 3.10+.
+- **Framework**: FastAPI (Async e High Performance).
+- **Banco de Dados**: SQLite (Relacional) + Pickle/Chroma (Vetorial).
+- **IA & NLP**:
+  - `Sentence Transformers` (Embeddings Multilíngues).
+  - `Google Gemini Flash` (Raciocínio e Classificação).
+  - `scikit-learn` (Cálculo de Similaridade de Cosseno).
+- **Utilitários**: ReportLab (PDF Engine), SMTP (E-mail Sender).
+
+---
+
+## ⚙️ Instalação e Execução
+
+### Pré-requisitos
+- Node.js 18+ e Python 3.10+
+- Chaves de API: Google Gemini, OpenAI/OpenRouter (Opcional), Mercado Pago.
+
+### 1. Backend
 ```bash
-# Entre na pasta do projeto
 cd backend
-
-# Crie e ative o ambiente virtual
 python3 -m venv venv
-source venv/bin/activate
-
-# Instale as dependências
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Rode o servidor
-uvicorn api:app --reload --host 0.0.0.0 --port 8000
+# Configure o .env com suas chaves
+cp .env.example .env
+
+# Execute
+uvicorn api:app --reload
 ```
 
-### 2. Frontend (Interface)
+### 2. Frontend
 ```bash
-# Na raiz do projeto
 npm install
 npm run dev
 ```
-Acesse: `http://localhost:5173`
+
+O sistema estará acessível em: `http://localhost:5173`.
 
 ---
 
-## 🔐 Acesso Administrativo
+## 🔐 Privacidade e Segurança (LGPD)
 
-Para acessar o painel de controle e ver os leads capturados:
-1. Acesse: `https://indenizaapp.com.br/admin` (ou `/admin` localmente)
-2. Senha Padrão: `admin123` (Configurável no `.env`)
-
----
-
-## 🤖 Inteligência Artificial
-
-O sistema utiliza um sistema híbrido de RAG (Retrieval-Augmented Generation):
-1. **Embedding**: O relato do usuário é convertido em vetor matemático.
-2. **Busca Semântica**: Comparamos esse vetor com milhares de decisões reais do TJPR pré-processadas.
-3. **Classificação (LLM)**: Usamos modelos Llama/Gemini para entender a categoria (Aéreo, Bancário, etc.) e validar o relato.
-4. **Cálculo Probabilístico**: Baseado no histórico de "Vitória" vs "Derrota" dos casos similares encontrados.
+O projeto foi desenhado com foco em *"Privacy by Design"*:
+- **Aviso de Privacidade**: Página dedicada explicando coleta e uso de dados.
+- **Transparência**: O usuário consente explicitamente antes de qualquer envio de contato.
+- **Retenção Mínima**: Dados sensíveis são armazenados apenas para a finalidade do serviço e podem ser excluídos mediante solicitação.
+- **Isenção de Responsabilidade**: O sistema deixa claro que **não substitui um advogado** e fornece apenas informações estatísticas.
 
 ---
 
-**Desenvolvido por IndenizaAi © 2026**
+**IndenizaAi © 2026** - *Tecnologia a serviço da cidadania.*

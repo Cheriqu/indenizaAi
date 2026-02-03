@@ -46,6 +46,7 @@ import SkeletonResults from "@/app/components/SkeletonResults";
 import Testimonials from "@/app/components/Testimonials";
 import { maskPhone } from "@/utils/maskPhone";
 import { api, loadStates, loadCitiesByState } from "@/services/api";
+import { Footer } from "@/app/components/Footer";
 
 export default function App() {
   // STATE: Flow Control
@@ -667,9 +668,7 @@ export default function App() {
               </div>
             </section>
 
-            <footer className="bg-[#1e293b] py-6 text-center">
-              <p className="text-sm text-[#94a3b8]">© 2026 IndenizaAí - Todos os direitos reservados</p>
-            </footer>
+            <Footer />
           </div>
         )}
       </section>
