@@ -308,14 +308,14 @@ export default function App() {
   const renderResult = () => (
     <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-3xl mx-auto">
       {/* Probability Section with Blur */}
-      <div className={`bg-green-50 rounded-xl p-4 border border-green-200 mb-6 text-center transition-all duration-500 ${!isAnalysisUnlocked ? 'blur-md select-none grayscale' : ''}`}>
+      <div className={`bg-green-50 rounded-xl p-4 border border-green-200 mb-6 text-center transition-all duration-500 ${!isAnalysisUnlocked ? 'blur-md select-none opacity-80' : ''}`}>
         <h3 className="text-[#15803d] font-bold uppercase tracking-wider text-xs mb-2">Análise Concluída com Sucesso</h3>
         <GaugeChart percentage={resultData.probabilidade} />
         <p className="text-gray-500 text-xs mt-2">Baseado em {resultData.n_casos} casos similares</p>
       </div>
 
       <div className="border-2 border-[#8ab03d] p-6 rounded-2xl shadow-lg relative bg-white">
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#8ab03d] text-white px-4 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#8ab03d] text-white px-4 py-1 rounded-full text-xs font-bold flex items-center gap-1 whitespace-nowrap">
           <Lock className="size-3" /> RELATÓRIO BLOQUEADO
         </div>
 
@@ -339,7 +339,7 @@ export default function App() {
             <div className="w-2/3 relative">
               <input
                 list="cities-list"
-                placeholder={selectedEstado ? "Digite a cidade..." : "Selecione o estado"}
+                placeholder={selectedEstado ? "Digite a cidade..." : "Selecione estado"}
                 className="border border-gray-300 p-3 rounded-xl w-full outline-none focus:ring-2 focus:ring-[#8ab03d] disabled:bg-gray-100"
                 value={formData.cidade.split(' - ')[0]}
                 disabled={!selectedEstado}
@@ -368,7 +368,7 @@ export default function App() {
               disabled={!isFormValid}
               className={`w-full text-white py-4 rounded-xl font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${!isFormValid ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#eab308] hover:bg-[#ca9a04]'}`}
             >
-              <Unlock className="size-5" /> DESBLOQUEAR ANÁLISE
+              <Unlock className="size-5" /> DESBLOQUEAR ANÁLISE GRATUITAMENTE
             </button>
           ) : (
             <button
@@ -483,7 +483,7 @@ export default function App() {
       {/* CONTENT AREA */}
       <section className="relative min-h-[80vh]">
         {/* Background Waves - TOP */}
-        <div className="absolute top-0 left-0 w-full h-[1500px] pointer-events-none overflow-hidden mix-blend-multiply opacity-40 -mt-56">
+        <div className="absolute top-0 left-0 w-full h-[2000px] pointer-events-none overflow-hidden mix-blend-multiply opacity-40 -mt-56">
           <img src={wavesBackground} alt="" className="w-full h-full object-contain scale-150 origin-top" />
         </div>
 
@@ -621,6 +621,31 @@ export default function App() {
                     <div className="bg-gradient-to-b from-[#d8ecc4] to-[#b8d99c] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Smile className="w-8 h-8 text-[#8AB03D]" /></div>
                     <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Score de crédito incorreto</h3>
                     <p className="text-base text-[#64748b] leading-relaxed">Score errado impactando suas finanças? Corrija e seja indenizado pelos danos.</p>
+                  </div>
+
+                  {/* NOVOS CARDS */}
+                  <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">
+                    <div className="bg-gradient-to-b from-[#fee2e2] to-[#fecaca] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Smartphone className="w-8 h-8 text-[#DC2626]" /></div>
+                    <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Golpes e Fraudes Pix</h3>
+                    <p className="text-base text-[#64748b] leading-relaxed">Caiu no golpe do Pix, boleto falso ou teve o celular roubado? Buscamos o ressarcimento.</p>
+                  </div>
+
+                  <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">
+                    <div className="bg-gradient-to-b from-[#e0ecf3] to-[#c5dae8] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><HeartPulse className="w-8 h-8 text-[#1C80B2]" /></div>
+                    <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Planos de Saúde</h3>
+                    <p className="text-base text-[#64748b] leading-relaxed">Cirurgia negada, home care recusado ou reajuste abusivo? Garanta seu tratamento.</p>
+                  </div>
+
+                  <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">
+                    <div className="bg-gradient-to-b from-[#fff7ed] to-[#ffedd5] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Lightbulb className="w-8 h-8 text-[#ea580c]" /></div>
+                    <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Corte de Luz ou Água</h3>
+                    <p className="text-base text-[#64748b] leading-relaxed">Serviço essencial cortado indevidamente ou cobrança abusiva (TOI)? Você tem direitos.</p>
+                  </div>
+
+                  <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">
+                    <div className="bg-gradient-to-b from-[#f3e8ff] to-[#d8b4fe] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Package className="w-8 h-8 text-[#9333ea]" /></div>
+                    <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Problemas com Compras</h3>
+                    <p className="text-base text-[#64748b] leading-relaxed">Produto não entregue, com defeito ou atrasou demais? Receba seu dinheiro ou indenização.</p>
                   </div>
                 </div>
               </div>

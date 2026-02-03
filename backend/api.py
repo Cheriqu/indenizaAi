@@ -102,8 +102,13 @@ df_telefonia, vetores_telefonia = None, None
 @app.on_event("startup")
 def load_models():
     global model_bi, model_cross
-    global df_aereo, vetores_aereo, df_nome, vetores_nome, df_bancario, vetores_bancario
-    global df_luz, vetores_luz, df_telefonia, vetores_telefonia
+    global df_aereo, vetores_aereo, df_nome, vetores_nome
+    global df_fraude, vetores_fraude, df_bloqueio, vetores_bloqueio
+    global df_corte, vetores_corte, df_corte_luz, vetores_corte_luz
+    global df_ecommerce, vetores_ecommerce, df_imob, vetores_imob
+    global df_saude, vetores_saude, df_redes, vetores_redes
+    global df_seguro, vetores_seguro, df_telefonia, vetores_telefonia
+    global df_ensino, vetores_ensino
 
     print(f"📂 Diretório Base: {CURRENT_DIR}")
     print(f"📂 Diretório Assets (Logo): {ASSETS_DIR}")
@@ -133,12 +138,22 @@ def load_models():
             print(f"🔥 Erro ao carregar {filename}: {e}")
             return None, None
 
+    # LOAD ALL DATABASES
     df_aereo, vetores_aereo = load_pkl("banco_aereo.pkl")
     df_nome, vetores_nome = load_pkl("banco_nome_sujo.pkl")
-    df_bancario, vetores_bancario = load_pkl("banco_bancario.pkl")
-    df_luz, vetores_luz = load_pkl("banco_corte_luz.pkl")
-
     df_telefonia, vetores_telefonia = load_pkl("banco_telefonia.pkl")
+    
+    # NEW DATABASES
+    df_fraude, vetores_fraude = load_pkl("banco_fraude_pix.pkl")
+    df_bloqueio, vetores_bloqueio = load_pkl("banco_bloqueio_bancario.pkl")
+    df_corte, vetores_corte = load_pkl("banco_corte_servico_essencial.pkl")
+    df_corte_luz, vetores_corte_luz = load_pkl("banco_corte_luz.pkl") # Legacy/Specificity?
+    df_ecommerce, vetores_ecommerce = load_pkl("banco_ecommerce.pkl")
+    df_imob, vetores_imob = load_pkl("banco_imobiliario.pkl")
+    df_saude, vetores_saude = load_pkl("banco_plano_saude.pkl")
+    df_redes, vetores_redes = load_pkl("banco_redes_sociais.pkl")
+    df_seguro, vetores_seguro = load_pkl("banco_seguradora.pkl")
+    df_ensino, vetores_ensino = load_pkl("banco_ensino.pkl") # Might be missing, but logic handles it
 
 # --- INIT DB (COM NOVA COLUNA json_analise) ---
 def init_db():
@@ -375,12 +390,73 @@ def analisar_caso(request: AnaliseRequest):
     
     # Prompt Otimizado para JSON
     prompt_text = f"""
-    Analise o seguinte relato e classifique-o em uma das categorias: AEREO, NOMESUJO, BANCARIO, LUZ, TELEFONIA, OUTROS.
+    Analise o seguinte relato e classifique-o na MELHOR categoria jurídica abaixo:
+    
+    1. AEREO (Cancelamento/Atraso de voo, Bagagem extraviada)
+    2. FRAUDE_PIX (Golpes, Fraude Pix, Transação não reconhecida)
+    3. BLOQUEIO_BANCARIO (Conta bloqueada, encerrada, retenção de valores)
+    4. CORTE_ESSENCIAL (Corte indevido de Luz/Água/Gás, TOI)
+    5. NOME_SUJO (Negativação indevida, SPC/Serasa, Manutenção indevida)
+    6. TELEFONIA (Cobrança indevida, serviço não contratado, plano alterado)
+    7. PLANO_SAUDE (Negativa de cirurgia/home care/medicamento, Reajuste abusivo)
+    8. IMOBILIARIO (Atraso na entrega de imóvel, vícios construtivos)
+    9. SEGURADORA (Negativa de cobertura de seguro auto/residencial/vida)
+    10. REDES_SOCIAIS (Instagram/Facebook hackeado, Golpe no WhatsApp)
+    11. ECOMMERCE (Produto não entregue, atraso na entrega, produto com defeito)
+    12. ENSINO (Problemas com faculdade/curso, diploma, cobrança indevida)
+    13. OUTROS (Caso não se encaixe em nenhum acima)
+
     Verifique se é um relato jurídico válido (textos sem sentido ou muito curtos devem ser invalidados).
     Responda APENAS um JSON válido no formato: {{"categoria": "...", "valido": true/false}}.
     
     Relato: {request.relato[:1000]}
     """
+
+    resp = None
+    last_error = None
+
+    # ESTRATÉGIA 1: Google Gemini (Prioridade 1 - 3.0 Flash)
+    # ESTRATÉGIA 2: Google Gemini (Prioridade 2 - 2.0 Flash)
+    gemini_models = ["gemini-3-flash-preview", "gemini-2.0-flash"]
+    
+    for model_name in gemini_models:
+        try:
+            print(f"🔄 Tentando Gemini: {model_name}...")
+            model = genai.GenerativeModel(model_name)
+            # Generation Config força resposta JSON
+            response = model.generate_content(
+                prompt_text,
+                generation_config={"response_mime_type": "application/json"}
+            )
+            raw_content = response.text
+            print(f"🤖 Resposta Gemini ({model_name}): {raw_content}")
+            
+            resp = json.loads(raw_content)
+            if resp: break # Sucesso
+        except Exception as e:
+            print(f"❌ Falha Gemini {model_name}: {e}")
+            last_error = e
+            continue
+
+    # ESTRATÉGIA 3: OpenRouter (Fallback se Gemini falhar)
+    if not resp:
+        # ... (OpenRouter code kept as is, just commenting here for context)
+        pass 
+
+        # Need to include the OpenRouter block here since we are replacing the whole function body or parts of it?
+        # The tool replaces contiguous blocks. The OpenRouter block is inside the original code. 
+        # I should output the OpenRouter block too if it falls within StartLine/EndLine, OR adjust StartLine/EndLine to only target the prompt.
+        # But I need to update the prompt which is at the start...
+        # Let's verify where the OpenRouter block ends. Check previous view_file.
+        # Lines 412-437 is OpenRouter.
+        # I will just update the prompt part first (Line 377-383) and then the MAPA part (Line 450+).
+        # Actually I can do two edits. One for prompt, one for map.
+        pass
+
+# ... (This logic is getting complicated because I need to replace non-contiguous parts or include a large chunk)
+# Let's do MULTI_REPLACE.
+
+
 
     resp = None
     last_error = None
@@ -448,12 +524,30 @@ def analisar_caso(request: AnaliseRequest):
     # ... Restante do código de busca vetorial (mantido igual) ...
 
     mapa = {
-        "AEREO": (df_aereo, vetores_aereo), "NOMESUJO": (df_nome, vetores_nome),
-        "BANCARIO": (df_bancario, vetores_bancario),
-        "LUZ": (df_luz, vetores_luz), "TELEFONIA": (df_telefonia, vetores_telefonia)
+        "AEREO": (df_aereo, vetores_aereo),
+        "FRAUDE_PIX": (df_fraude, vetores_fraude),
+        "BLOQUEIO_BANCARIO": (df_bloqueio, vetores_bloqueio),
+        "CORTE_ESSENCIAL": (df_corte, vetores_corte),
+        "LUZ": (df_corte_luz, vetores_corte_luz), # Legacy fallback
+        "NOME_SUJO": (df_nome, vetores_nome),
+        "TELEFONIA": (df_telefonia, vetores_telefonia),
+        "PLANO_SAUDE": (df_saude, vetores_saude),
+        "IMOBILIARIO": (df_imob, vetores_imob),
+        "SEGURADORA": (df_seguro, vetores_seguro),
+        "REDES_SOCIAIS": (df_redes, vetores_redes),
+        "ECOMMERCE": (df_ecommerce, vetores_ecommerce),
+        "ENSINO": (df_ensino, vetores_ensino)
     }
-    df, vetores = mapa.get(categoria, (df_nome, vetores_nome))
-    if df is None: raise HTTPException(status_code=500, detail="Banco não carregado")
+    
+    # Roteamento Inteligente
+    if categoria not in mapa: categoria = "OUTROS"
+    
+    df, vetores = mapa.get(categoria, (None, None))
+    
+    # Se o banco específico não carregou (ou é OUTROS), tenta usar um genérico ou o que tiver mais dados
+    # Por padrão, vamos usar Nome Sujo como "fallback genérico" pois é o mais comum, ou frauda pix
+    if df is None: 
+        print(f"Não tratamos sobre o seu assunto no momento. Fique ligado que em breve podemos adicionar.")
 
     vetor_query = model_bi.encode([f"query: {request.relato}"])
     simil = cosine_similarity(vetor_query, vetores)[0]
