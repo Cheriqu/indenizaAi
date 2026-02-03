@@ -23,6 +23,15 @@ export const api = {
         return await response.json();
     },
 
+    saveLead: async (payload: any) => {
+        const response = await fetch(`${API_URL}/salvar_lead`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        return await response.json();
+    },
+
     getRelatorio: async (id: string) => {
         const response = await fetch(`${API_URL}/relatorio/${id}`);
         if (!response.ok) throw new Error("Erro ao buscar relatório");

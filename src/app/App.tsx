@@ -28,7 +28,11 @@ import {
   ExternalLink,
   ChevronRight,
   History,
-  Unlock
+  Unlock,
+  Smartphone,
+  Lightbulb,
+  HeartPulse,
+  Package
 } from "lucide-react";
 import logoImage from "@/assets/logo.png";
 import wavesBackground from "@/assets/background-waves.png";
@@ -62,6 +66,7 @@ export default function App() {
 
   // STATE: Payment Polling
   const [aguardandoPagamento, setAguardandoPagamento] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // STATE: History
   const [historico, setHistorico] = useState<string[]>([]);
@@ -299,10 +304,23 @@ export default function App() {
 
   const isFormValid = formData.nome && formData.email && formData.whatsapp && selectedEstado && formData.cidade && formData.aceitaAdvogado;
 
-  const handleUnlockAnalysis = () => {
+  const handleUnlockAnalysis = async () => {
     if (!isFormValid) return alert("Por favor, preencha todos os campos para ver o resultado.");
-    setIsAnalysisUnlocked(true);
-    // Opcional: Salvar o lead aqui também se desejar
+
+    setIsSaving(true);
+    try {
+      const payload = {
+        ...formData, resumo: inputValue, categoria: resultData.categoria,
+        prob: resultData.probabilidade, valor: resultData.valor_estimado, aceita_advogado: formData.aceitaAdvogado, id_analise: analiseId
+      };
+      await api.saveLead(payload);
+      setIsAnalysisUnlocked(true);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao salvar contato. Tente novamente.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const renderResult = () => (
@@ -365,10 +383,10 @@ export default function App() {
           {!isAnalysisUnlocked ? (
             <button
               onClick={handleUnlockAnalysis}
-              disabled={!isFormValid}
-              className={`w-full text-white py-4 rounded-xl font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${!isFormValid ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#eab308] hover:bg-[#ca9a04]'}`}
+              disabled={!isFormValid || isSaving}
+              className={`w-full text-white py-4 rounded-xl font-bold shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 ${!isFormValid || isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#eab308] hover:bg-[#ca9a04]'}`}
             >
-              <Unlock className="size-5" /> DESBLOQUEAR ANÁLISE GRATUITAMENTE
+              {isSaving ? <Loader2 className="animate-spin size-5" /> : <Unlock className="size-5" />} DESBLOQUEAR ANÁLISE GRATUITAMENTE
             </button>
           ) : (
             <button
@@ -614,16 +632,14 @@ export default function App() {
                   </div>
                   <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">
                     <div className="bg-gradient-to-b from-[#e0ecf3] to-[#c5dae8] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Plane className="w-8 h-8 text-[#1C80B2]" /></div>
-                    <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Atrasos de voo</h3>
-                    <p className="text-base text-[#64748b] leading-relaxed">Voo atrasado ou cancelado? Você pode ter direito a até R$ 10.000 de indenização.</p>
+                    <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Companhias Aéreas</h3>
+                    <p className="text-base text-[#64748b] leading-relaxed">Problemas com voos cancelados ou extravio de bagagem? Você pode ter direito a indenização.</p>
                   </div>
                   <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">
                     <div className="bg-gradient-to-b from-[#d8ecc4] to-[#b8d99c] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Smile className="w-8 h-8 text-[#8AB03D]" /></div>
-                    <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Score de crédito incorreto</h3>
-                    <p className="text-base text-[#64748b] leading-relaxed">Score errado impactando suas finanças? Corrija e seja indenizado pelos danos.</p>
+                    <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Score de crédito</h3>
+                    <p className="text-base text-[#64748b] leading-relaxed">Nome negativado de forma indevida? Corrija e seja indenizado pelos danos.</p>
                   </div>
-
-                  {/* NOVOS CARDS */}
                   <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">
                     <div className="bg-gradient-to-b from-[#fee2e2] to-[#fecaca] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Smartphone className="w-8 h-8 text-[#DC2626]" /></div>
                     <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Golpes e Fraudes Pix</h3>
@@ -639,7 +655,7 @@ export default function App() {
                   <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">
                     <div className="bg-gradient-to-b from-[#fff7ed] to-[#ffedd5] w-16 h-16 rounded-2xl flex items-center justify-center mb-6"><Lightbulb className="w-8 h-8 text-[#ea580c]" /></div>
                     <h3 className="text-2xl font-semibold text-[#0f172a] mb-3 font-archivo">Corte de Luz ou Água</h3>
-                    <p className="text-base text-[#64748b] leading-relaxed">Serviço essencial cortado indevidamente ou cobrança abusiva (TOI)? Você tem direitos.</p>
+                    <p className="text-base text-[#64748b] leading-relaxed">Serviço essencial cortado indevidamente ou cobrança abusiva? Você tem direitos.</p>
                   </div>
 
                   <div className="problem-card bg-white rounded-2xl p-10 border-2 border-[#e2e8f0] shadow-lg shadow-[#1c80b2]/10 transition-all duration-300 hover:-translate-y-1 hover:border-[#1c80b2]/30 hover:shadow-xl hover:shadow-[#1c80b2]/15">

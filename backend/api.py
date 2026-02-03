@@ -438,25 +438,6 @@ def analisar_caso(request: AnaliseRequest):
             last_error = e
             continue
 
-    # ESTRATÉGIA 3: OpenRouter (Fallback se Gemini falhar)
-    if not resp:
-        # ... (OpenRouter code kept as is, just commenting here for context)
-        pass 
-
-        # Need to include the OpenRouter block here since we are replacing the whole function body or parts of it?
-        # The tool replaces contiguous blocks. The OpenRouter block is inside the original code. 
-        # I should output the OpenRouter block too if it falls within StartLine/EndLine, OR adjust StartLine/EndLine to only target the prompt.
-        # But I need to update the prompt which is at the start...
-        # Let's verify where the OpenRouter block ends. Check previous view_file.
-        # Lines 412-437 is OpenRouter.
-        # I will just update the prompt part first (Line 377-383) and then the MAPA part (Line 450+).
-        # Actually I can do two edits. One for prompt, one for map.
-        pass
-
-# ... (This logic is getting complicated because I need to replace non-contiguous parts or include a large chunk)
-# Let's do MULTI_REPLACE.
-
-
 
     resp = None
     last_error = None
@@ -544,10 +525,9 @@ def analisar_caso(request: AnaliseRequest):
     
     df, vetores = mapa.get(categoria, (None, None))
     
-    # Se o banco específico não carregou (ou é OUTROS), tenta usar um genérico ou o que tiver mais dados
-    # Por padrão, vamos usar Nome Sujo como "fallback genérico" pois é o mais comum, ou frauda pix
-    if df is None: 
-        print(f"Não tratamos sobre o seu assunto no momento. Fique ligado que em breve podemos adicionar.")
+    # Se o banco específico não carregou (ou é OUTROS)
+    if df is None or categoria == "OUTROS":
+        return {"erro": "Não tratamos deste caso no momento. Fique ligado que em breve poderemos adicionar."}
 
     vetor_query = model_bi.encode([f"query: {request.relato}"])
     simil = cosine_similarity(vetor_query, vetores)[0]
@@ -621,6 +601,31 @@ def analisar_caso(request: AnaliseRequest):
         print(f"Erro ao salvar lead parcial: {e}")
 
     return {"id_analise": id_analise, "probabilidade": prob, "valor_estimado": val, "categoria": categoria, "n_casos": len(finais), "casos": casos_censurados}
+
+@app.post("/api/salvar_lead")
+def salvar_lead(lead: LeadData):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # Verifica se existe
+    c.execute("SELECT id FROM leads WHERE id_analise = ?", (lead.id_analise,))
+    exists = c.fetchone()
+    
+    if exists:
+        c.execute("UPDATE leads SET nome=?, email=?, whatsapp=?, cidade=? WHERE id_analise=?",
+                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.id_analise))
+    else:
+        # Fallback de segurança
+        dados_json = None
+        if lead.id_analise in ANALISES_CACHE:
+            try: dados_json = json.dumps(ANALISES_CACHE[lead.id_analise], ensure_ascii=False)
+            except: pass
+            
+        c.execute("INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise, json_analise) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise, dados_json))
+    
+    conn.commit()
+    conn.close()
+    return {"status": "saved"}
 
 @app.post("/api/pagar")
 def gerar_pagamento(lead: LeadData):
