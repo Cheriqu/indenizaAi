@@ -311,8 +311,16 @@ export default function App() {
     setIsSaving(true);
     try {
       const payload = {
-        ...formData, resumo: inputValue, categoria: resultData.categoria,
-        prob: resultData.probabilidade, valor: resultData.valor_estimado, aceita_advogado: formData.aceitaAdvogado, id_analise: analiseId
+        nome: formData.nome,
+        email: formData.email,
+        whatsapp: formData.whatsapp,
+        cidade: formData.cidade,
+        resumo: inputValue,
+        categoria: resultData.categoria,
+        prob: resultData.probabilidade,
+        valor: resultData.valor_estimado,
+        aceita_advogado: formData.aceitaAdvogado,
+        id_analise: analiseId
       };
       await api.saveLead(payload);
       setIsAnalysisUnlocked(true);

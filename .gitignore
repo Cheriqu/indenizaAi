@@ -7,3 +7,6 @@ __pycache__
 *.db
 .DS_Store
 *.log
+
+# Banco Vetorial (Core Business)
+backend/chroma_db/

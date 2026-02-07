@@ -42,7 +42,7 @@ export default function About() {
                             <div>
                                 <h2 className="text-xl font-bold text-[#0f172a] mb-3">Como Funciona</h2>
                                 <p className="text-gray-600 leading-relaxed text-justify">
-                                    O IndenizaAi é uma plataforma de tecnologia voltada para a análise jurimétrica preliminar de casos cotidianos. Utilizamos inteligência artificial para comparar relatos de usuários com bases de dados públicas de tribunais, oferecendo uma estimativa estatística de probabilidade e valores.
+                                    O IndenizaAi é uma plataforma de tecnologia voltada para a análise jurimétrica preliminar de casos cotidianos. Utilizamos inteligência artificial para comparar relatos de usuários com bases de dados públicas de tribunais, oferecendo uma estimativa estatística de probabilidade e valores baseada em jurisprudência passada (o que não garante o mesmo entendimento futuro por parte dos juízes, visto que decisões judiciais podem mudar).
                                     <br /><br />
                                     <strong>Importante:</strong> Não somos um escritório de advocacia e não prestamos consultoria jurídica. As informações fornecidas são meramente informativas e baseadas em dados históricos, não garantindo resultado futuro. A decisão de buscar reparação judicial é exclusiva do usuário, que deve sempre consultar um profissional habilitado (advogado) para orientação técnica específica. O IndenizaAi se exime de qualquer responsabilidade sobre o desfecho de processos judiciais ou extrajudiciais iniciados com base em nossas análises.
                                 </p>
@@ -95,7 +95,9 @@ export default function About() {
 
                             <h4 className="font-bold text-gray-700 mt-4 mb-2">3. COMO E POR QUE TRATAMOS SEUS DADOS</h4>
                             <p className="mb-2">
-                                Tratamos seus dados pessoais para executar o serviço contratado (análise jurimétrica) e, mediante seu consentimento (checkbox "Aceita Advogado"), para conectá-lo a parceiros jurídicos. A base legal para o tratamento é a Execução de Contrato e o Consentimento do titular.
+                                Tratamos seus dados pessoais para executar o serviço contratado (análise jurimétrica).
+                                <br /><br />
+                                <strong>Conexão com Advogados:</strong> Apenas mediante seu consentimento expresso (ao marcar a opção "Aceita Advogado"), compartilharemos seu relato e contatos com escritórios de advocacia parceiros especializados na sua causa. A base legal para este compartilhamento é o Consentimento (Art. 7º, I, LGPD).
                             </p>
 
                             <h4 className="font-bold text-gray-700 mt-4 mb-2">4. ARMAZENAMENTO E SEGURANÇA</h4>

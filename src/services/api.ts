@@ -29,6 +29,11 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+        if (!response.ok) {
+            const err = await response.json();
+            console.error("Erro salvar lead:", err);
+            throw new Error(err.detail || "Erro ao salvar contato");
+        }
         return await response.json();
     },
 
