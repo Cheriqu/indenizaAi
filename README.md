@@ -112,3 +112,4 @@ npm run dev   # Para desenvolvimento
 ---
 
 **IndenizaAi © 2026** - *Tecnologia a serviço da cidadania.*
+ 
