@@ -139,6 +139,8 @@ def load_models():
         logger.info("✅ Modelos de IA carregados.")
     except Exception as e: 
         logger.error(f"Erro IA/DB: {e}")
+        # Adicionando mais detalhes para debug
+        logger.error(f"Detalhes do erro: {traceback.format_exc()}")
 
 # --- INIT DB ---
 def init_db():
