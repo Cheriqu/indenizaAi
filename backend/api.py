@@ -340,8 +340,8 @@ def analisar_caso(request: AnaliseRequest):
     resp = None
     last_error = None
 
-    # TENTATIVA 1: Gemini
-    gemini_models = ["gemini-2.0-flash", "gemini-1.5-flash"]
+    # TENTATIVA 1: Gemini (com nova biblioteca)
+    gemini_models = ["gemini-2.5-flash-lite", "gemini-2.0-flash"] # Modelos para tentar funcionar
     for model_name in gemini_models:
         try:
             logger.info(f"🔄 Tentando Gemini: {model_name}...")
@@ -613,6 +613,44 @@ def admin_export_csv(auth: AdminAuth):
     df.to_csv(stream, index=False, encoding='utf-8-sig', sep=';')
     stream.seek(0)
     return StreamingResponse(stream, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=Leads.csv"})
+
+@app.get("/api/teste_aprovar/{id_analise}")
+def teste_aprovar(id_analise: str):
+    logger.info(f"🧪 Aprovando (teste) análise: {id_analise}")
+    
+    # 1. Atualiza DB
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE leads SET pagou = 1 WHERE id_analise = ?", (id_analise,))
+    conn.commit()
+    
+    # Pega dados para envio de email
+    c.execute("SELECT nome, email FROM leads WHERE id_analise = ?", (id_analise,))
+    lead = c.fetchone()
+    conn.close()
+    
+    if not lead:
+        logger.error(f"❌ Lead não encontrado para id_analise: {id_analise}")
+        raise HTTPException(status_code=404, detail="Lead não encontrado para aprovação")
+    
+    # 2. Atualiza Cache / Recupera JSON
+    dados_analise = get_analise_data(id_analise)
+    if dados_analise:
+        dados_analise["pago"] = True # Garante status
+        
+        # 3. Envia Email
+        logger.info(f"📧 Tentando enviar e-mail para {lead[1]}...")
+        try:
+            pdf = criar_pdf_bytes(dados_analise, lead[0])
+            enviar_email_pdf(lead[1], lead[0], pdf)
+            logger.info(f"✅ E-mail enviado com sucesso para {lead[1]}.")
+            return {"status": "ok", "mensagem": "E-mail enviado."}
+        except Exception as e:
+            logger.error(f"❌ Falha no envio do e-mail de teste: {e}")
+            raise HTTPException(status_code=500, detail="Falha ao gerar ou enviar o PDF.")
+    else:
+        logger.error(f"❌ Dados da análise não encontrados no cache/DB para id: {id_analise}")
+        raise HTTPException(status_code=404, detail="Dados da análise não encontrados")
 
 @app.get("/")
 def root(): return {"status": "Online", "db": "ChromaDB"}
