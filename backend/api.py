@@ -82,8 +82,31 @@ if not SENHA_ADMIN:
 # Configurações de E-mail
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
-EMAIL_USER = os.getenv("EMAIL_USER", "seu_email@gmail.com")
+EMAIL_USER = os.getenv("EMAIL_USER", "seu_email@gmail.com") # Remetente (From)
+EMAIL_LOGIN = os.getenv("EMAIL_LOGIN", EMAIL_USER) # Login SMTP (pode ser diferente do From)
 EMAIL_PASS = os.getenv("EMAIL_PASS", "sua_senha_de_app")
+
+# --- FUNÇÃO ENVIAR EMAIL ---
+def enviar_email_pdf(destinatario, nome, pdf_buffer):
+    try:
+        if "seu_email" in EMAIL_USER: return
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_USER
+        msg['To'] = destinatario
+        msg['Subject'] = "Seu Relatório Indeniza Aí Chegou! ⚖️"
+        body = f"Olá, {nome}!\n\nSeu relatório completo de análise jurimétrica está anexo.\n\nAtenciosamente,\nEquipe Indeniza Aí."
+        msg.attach(MIMEText(body, 'plain'))
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(pdf_buffer.getvalue())
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', f'attachment; filename="Relatorio_IndenizaAi_{nome}.pdf"')
+        msg.attach(part)
+        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
+        server.starttls()
+        server.login(EMAIL_LOGIN, EMAIL_PASS) # Usa EMAIL_LOGIN
+        server.sendmail(EMAIL_USER, destinatario, msg.as_string()) # Usa EMAIL_USER no envelope
+        server.quit()
+    except Exception as e: logger.error(f"❌ Erro Email: {e}")
 
 # --- COFRE TEMPORÁRIO (CACHE) ---
 # TTL: 24 horas, Max: 1000 itens
