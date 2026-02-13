@@ -332,6 +332,8 @@ export default function App() {
     }
   };
 
+
+
   const renderResult = () => (
     <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-3xl mx-auto">
       {/* Probability Section with Blur */}
@@ -414,6 +416,8 @@ export default function App() {
 
       <div className="text-center mt-6">
         <button onClick={() => setStep('INPUT')} className="text-[#64748b] text-sm underline hover:text-[#1c80b2]">Fazer nova análise</button>
+
+
       </div>
     </div>
   );
@@ -468,6 +472,8 @@ export default function App() {
           <Download className="size-6" /> BAIXAR RELATÓRIO COMPLETO (PDF)
         </button>
         <button onClick={() => setStep('INPUT')} className="text-[#64748b] text-sm underline mx-auto hover:text-[#1c80b2]">Fazer nova análise</button>
+
+
       </div>
     </div>
   );

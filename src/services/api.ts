@@ -54,7 +54,9 @@ export const api = {
 
     triggerApproval: async (id: string) => {
         await fetch(`${API_URL}/teste_aprovar/${id}`);
-    }
+    },
+
+
 };
 
 export const loadStates = async () => {

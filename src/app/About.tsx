@@ -61,7 +61,7 @@ export default function About() {
                                 <p className="text-gray-600 leading-relaxed text-justify">
                                     Prezamos pela transparência e satisfação total de nossos usuários. Caso você não fique satisfeito com o relatório gerado ou sinta que a análise não atendeu às suas expectativas, garantimos o seu direito ao reembolso.
                                     <br /><br />
-                                    Você pode solicitar a devolução integral do valor pago em até 7 dias, através de qualquer um dos nossos canais de atendimento (e-mail ou Instagram). Nos comprometemos a realizar o estorno financeiro em até <strong>3 dias úteis</strong> após a solicitação, sem burocracia.
+                                    Você pode solicitar a devolução integral do valor pago em até 7 dias, através do nosso e-mail oficial: <strong>contato@indenizaapp.com.br</strong>. Nos comprometemos a realizar o estorno financeiro em até <strong>3 dias úteis</strong> após a solicitação, sem burocracia.
                                 </p>
                             </div>
                         </div>
@@ -107,7 +107,7 @@ export default function About() {
 
                             <h4 className="font-bold text-gray-700 mt-4 mb-2">5. SEUS DIREITOS</h4>
                             <p className="mb-2">
-                                Você pode solicitar a confirmação da existência de tratamento, o acesso aos dados, a correção de dados incompletos ou a eliminação dos dados pessoais a qualquer momento através de nossos canais de atendimento.
+                                Você pode solicitar a confirmação da existência de tratamento, o acesso aos dados, a correção de dados incompletos ou a eliminação dos dados pessoais a qualquer momento através do e-mail encarregado: <strong>contato@indenizaapp.com.br</strong>.
                             </p>
                         </div>
                     </section>

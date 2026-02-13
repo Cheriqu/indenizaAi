@@ -16,7 +16,7 @@ from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
 from io import BytesIO
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -26,6 +26,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from urllib.parse import quote
 import re
+import requests
+import base64
 
 # --- REPORTLAB (GERADOR DE PDF) ---
 from reportlab.lib.pagesizes import A4
@@ -79,34 +81,74 @@ if not SENHA_ADMIN:
     logger.warning("⚠️ AVISO: SENHA_ADMIN não definida no .env. Admin bloqueado.")
     SENHA_ADMIN = None
 
-# Configurações de E-mail
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
-EMAIL_USER = os.getenv("EMAIL_USER", "seu_email@gmail.com") # Remetente (From)
-EMAIL_LOGIN = os.getenv("EMAIL_LOGIN", EMAIL_USER) # Login SMTP (pode ser diferente do From)
-EMAIL_PASS = os.getenv("EMAIL_PASS", "sua_senha_de_app")
 
-# --- FUNÇÃO ENVIAR EMAIL ---
+
+# --- FUNÇÃO ENVIAR EMAIL (VIA API BREVO) ---
 def enviar_email_pdf(destinatario, nome, pdf_buffer):
+    # Pega a chave API do .env (onde você colocou a chave xkeysib...)
+    API_KEY = os.getenv("BREVO_API_KEY") 
+    
+    if not API_KEY or not API_KEY.startswith("xkeysib"):
+        logger.error("❌ Erro: Chave API da Brevo não encontrada ou inválida no .env")
+        return
+
+    url = "https://api.brevo.com/v3/smtp/email"
+    
+    # Prepara o PDF para envio (Converte para Base64)
     try:
-        if "seu_email" in EMAIL_USER: return
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = destinatario
-        msg['Subject'] = "Seu Relatório Indeniza Aí Chegou! ⚖️"
-        body = f"Olá, {nome}!\n\nSeu relatório completo de análise jurimétrica está anexo.\n\nAtenciosamente,\nEquipe Indeniza Aí."
-        msg.attach(MIMEText(body, 'plain'))
-        part = MIMEBase('application', 'octet-stream')
-        part.set_payload(pdf_buffer.getvalue())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f'attachment; filename="Relatorio_IndenizaAi_{nome}.pdf"')
-        msg.attach(part)
-        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
-        server.starttls()
-        server.login(EMAIL_LOGIN, EMAIL_PASS) # Usa EMAIL_LOGIN
-        server.sendmail(EMAIL_USER, destinatario, msg.as_string()) # Usa EMAIL_USER no envelope
-        server.quit()
-    except Exception as e: logger.error(f"❌ Erro Email: {e}")
+        pdf_base64 = base64.b64encode(pdf_buffer.getvalue()).decode('utf-8')
+    except Exception as e:
+        logger.error(f"❌ Erro ao processar PDF para email: {e}")
+        return
+
+    # Monta o pacote igual ao Postman
+    payload = {
+        "sender": {
+            "name": "Equipe Indeniza Aí",
+            "email": "contato@indenizaapp.com.br" # Seu email validado
+        },
+        "to": [
+            {
+                "email": destinatario,
+                "name": nome
+            }
+        ],
+        "subject": "Seu Relatório Indeniza Aí Chegou! ⚖️",
+        "htmlContent": f"""
+        <html>
+            <body>
+                <p>Olá, {nome}!</p>
+                <p>Seu relatório completo de análise jurimétrica está anexo.</p>
+                <br>
+                <p>Atenciosamente,</p>
+                <p><strong>Equipe Indeniza Aí</strong></p>
+            </body>
+        </html>
+        """,
+        "attachment": [
+            {
+                "content": pdf_base64,
+                "name": f"Relatorio_IndenizaAi_{nome}.pdf"
+            }
+        ]
+    }
+    
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": API_KEY
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        
+        if response.status_code in [200, 201, 202]:
+            logger.info(f"✅ Email enviado via API para {destinatario}")
+        else:
+            logger.error(f"❌ Erro API Brevo: {response.text}")
+            
+    except Exception as e:
+        logger.error(f"❌ Erro Request: {e}")
 
 # --- COFRE TEMPORÁRIO (CACHE) ---
 # TTL: 24 horas, Max: 1000 itens
@@ -310,27 +352,7 @@ def criar_pdf_bytes(dados_analise, nome_cliente):
     buffer.seek(0)
     return buffer
 
-# --- FUNÇÃO ENVIAR EMAIL ---
-def enviar_email_pdf(destinatario, nome, pdf_buffer):
-    try:
-        if "seu_email" in EMAIL_USER: return
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = destinatario
-        msg['Subject'] = "Seu Relatório Indeniza Aí Chegou! ⚖️"
-        body = f"Olá, {nome}!\n\nSeu relatório completo de análise jurimétrica está anexo.\n\nAtenciosamente,\nEquipe Indeniza Aí."
-        msg.attach(MIMEText(body, 'plain'))
-        part = MIMEBase('application', 'octet-stream')
-        part.set_payload(pdf_buffer.getvalue())
-        encoders.encode_base64(part)
-        part.add_header('Content-Disposition', f'attachment; filename="Relatorio_IndenizaAi_{nome}.pdf"')
-        msg.attach(part)
-        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, destinatario, msg.as_string())
-        server.quit()
-    except Exception as e: logger.error(f"❌ Erro Email: {e}")
+
 
 # --- ENDPOINTS ---
 
@@ -542,7 +564,7 @@ def gerar_pagamento(lead: LeadData):
     except: return {"link": "https://mercadopago.com.br"}
 
 @app.post("/api/webhook")
-async def webhook(request: Request):
+async def webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         data = await request.json()
         if data.get("type") == "payment":
@@ -562,7 +584,9 @@ async def webhook(request: Request):
                 if dados and lead:
                     dados["pago"] = True
                     pdf = criar_pdf_bytes(dados, lead[0])
-                    enviar_email_pdf(lead[1], lead[0], pdf)
+                    # Envio assíncrono para evitar timeout do Mercado Pago
+                    background_tasks.add_task(enviar_email_pdf, lead[1], lead[0], pdf)
+                    logger.info(f"⏳ Envio de email agendado para {lead[1]}")
         return {"status": "ok"}
     except: return {"status": "error"}
 

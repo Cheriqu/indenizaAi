@@ -12,5 +12,4 @@ openai
 reportlab
 cachetools
 python-multipart
-secure-smtplib
 GitPython
