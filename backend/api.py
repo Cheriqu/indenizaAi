@@ -8,7 +8,8 @@ import json
 import traceback
 import uuid
 import smtplib
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import chromadb
 import logging
 from logging.handlers import RotatingFileHandler
@@ -206,6 +207,12 @@ class AdminAuth(BaseModel):
 class AdminActionRequest(BaseModel):
     senha: str
     id_analise: str
+
+# --- MODELO PARA IA (Google GenAI) ---
+class ClassificacaoCaso(BaseModel):
+    categoria: str = Field(description="A categoria jurídica do caso. Deve ser uma das permitidas.")
+    valido: bool = Field(description="Se o relato é um caso jurídico válido e tem informações suficientes.")
+    razao_invalido: str | None = Field(default=None, description="Explicação curta se não for válido.")
 
 # --- CARREGAMENTO DE IA ---
 model_bi = None
@@ -407,11 +414,15 @@ def criar_pdf_bytes(dados_analise, nome_cliente):
 @app.post("/api/analisar")
 def analisar_caso(request: AnaliseRequest):
     GOOGLE_KEY = os.getenv("GOOGLE_API_KEY")
-    genai.configure(api_key=GOOGLE_KEY)
+    if not GOOGLE_KEY:
+        raise HTTPException(status_code=500, detail="Chave da IA não configurada.")
+
+    client = genai.Client(api_key=GOOGLE_KEY)
     
     prompt_text = f"""
-    Analise o seguinte relato e classifique-o na MELHOR categoria jurídica abaixo:
+    Analise o seguinte relato e classifique-o na MELHOR categoria jurídica abaixo.
     
+    Categorias Permitidas:
     1. AEREO (Cancelamento/Atraso de voo, Bagagem extraviada)
     2. FRAUDE_PIX (Golpes, Fraude Pix, Transação não reconhecida)
     3. BLOQUEIO_BANCARIO (Conta bloqueada, encerrada, retenção de valores)
@@ -426,56 +437,56 @@ def analisar_caso(request: AnaliseRequest):
     12. ENSINO (Problemas com faculdade/curso, diploma, cobrança indevida)
     13. OUTROS (Caso não se encaixe em nenhum acima)
 
-    Verifique se é um relato jurídico válido (textos sem sentido ou muito curtos devem ser invalidados).
-    Responda APENAS um JSON válido no formato: {{"categoria": "...", "valido": true/false}}.
+    Instruções:
+    - Se o texto for muito curto, sem sentido ou não descrever um problema jurídico, marque valido=False.
+    - Se for válido, escolha a categoria exata da lista acima.
     
-    Relato: {request.relato[:1000]}
+    Relato: {request.relato[:2000]}
     """
 
-    resp = None
-    last_error = None
+    resp_obj = None
 
-    # TENTATIVA 1: Gemini (com nova biblioteca)
-    gemini_models = ["gemini-2.5-flash-lite", "gemini-2.0-flash"] # Modelos para tentar funcionar
-    for model_name in gemini_models:
+    # TENTATIVA 1: Gemini (Nova Lib com Structured Outputs)
+    try:
+        logger.info("🔄 Solicitando análise ao Gemini (Structured Output)...")
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt_text,
+            config=types.GenerateContentConfig(
+                response_mime_type='application/json',
+                response_schema=ClassificacaoCaso
+            )
+        )
+        # Parse automático do Pydantic
+        resp_obj = response.parsed
+    except Exception as e:
+        logger.error(f"❌ Falha Gemini SDK: {e}")
+        # Fallback manual ou erro direto
+    
+    # Se falhar o SDK novo, tenta o OpenRouter (Fallback)
+    if not resp_obj:
+        client_or = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENAI_KEY)
         try:
-            logger.info(f"🔄 Tentando Gemini: {model_name}...")
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt_text, generation_config={"response_mime_type": "application/json"})
-            resp = json.loads(response.text)
-            if resp: break
+            logger.info("🔄 Tentando OpenRouter (Fallback)...")
+            check = client_or.chat.completions.create(
+                model="google/gemini-2.0-flash-lite-preview-02-05:free", 
+                messages=[{"role": "user", "content": prompt_text + " Responda APENAS JSON: {categoria: str, valido: bool}"}], 
+                temperature=0.1
+            )
+            raw_json = re.search(r'\{.*\}', check.choices[0].message.content, re.DOTALL).group(0)
+            data_dict = json.loads(raw_json)
+            resp_obj = ClassificacaoCaso(**data_dict) # Converte dict para Pydantic
         except Exception as e:
-            logger.error(f"❌ Falha Gemini {model_name}: {e}")
-            last_error = e
-            continue
+            logger.error(f"❌ Falha OpenRouter: {e}")
 
-    # TENTATIVA 2: OpenRouter
-    if not resp:
-        client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENAI_KEY)
-        openrouter_models = ["google/gemini-pro-1.5", "meta-llama/llama-3.3-70b-instruct:free"]
-        for model in openrouter_models:
-            try:
-                logger.info(f"🔄 Tentando OpenRouter: {model}...")
-                check = client.chat.completions.create(
-                    model=model, 
-                    messages=[{"role": "user", "content": prompt_text + " Responda apenas JSON."}], 
-                    temperature=0.1
-                )
-                match = re.search(r'\{.*\}', check.choices[0].message.content, re.DOTALL)
-                if match: 
-                    resp = json.loads(match.group(0))
-                    break
-            except Exception as e:
-                logger.error(f"❌ Falha OpenRouter {model}: {e}")
-                continue
-
-    if not resp:
+    if not resp_obj:
         raise HTTPException(status_code=503, detail="IA indisponível no momento.")
 
-    if not resp.get("valido"):
-        raise HTTPException(status_code=400, detail="Relato Inválido ou Curto Demais")
+    if not resp_obj.valido:
+        msg = resp_obj.razao_invalido or "Relato Inválido ou Curto Demais"
+        raise HTTPException(status_code=400, detail=msg)
     
-    categoria = resp.get("categoria", "OUTROS")
+    categoria = resp_obj.categoria
     
     # --- BUSCA NO CHROMADB ---
     if categoria == "OUTROS":

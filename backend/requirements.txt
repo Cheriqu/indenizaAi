@@ -4,7 +4,7 @@ python-dotenv
 pandas
 numpy
 mercadopago
-google-generativeai
+google-genai
 chromadb
 sentence-transformers
 scikit-learn
