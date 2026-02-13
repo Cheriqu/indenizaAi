@@ -1,115 +1,102 @@
-# ⚖️ IndenizaAi
+# ⚖️ IndenizaAi - Plataforma de Jurimetria Automatizada
 
-**IndenizaAi** é uma plataforma de **LegalTech** que utiliza Inteligência Artificial e Jurimetria para democratizar o acesso à justiça. Analisamos relatos de problemas cotidianos (como voos cancelados, golpes digitais, negativação indevida, etc.) comparando-os com milhares de decisões reais dos tribunais brasileiros (TJPR) para estimar a probabilidade de ganho de causa e valores de indenização.
-
-O projeto combina uma **Landing Page de Alta Conversão** com um **Backend Seguro e Escalável**, utilizando **RAG (Retrieval-Augmented Generation)** sobre uma base vetorial otimizada.
-
----
-
-## 🚀 Funcionalidades
-
-### 👤 Para o Cidadão (Cliente Final)
-- **Diagnóstico Jurídico com IA**: Análise semântica do relato em segundos.
-- **Relatório Completo**:
-  - 🚦 **Probabilidade de Êxito**: Baseada em estatística real de casos similares.
-  - 💰 **Estimativa de Valor**: Média das condenações recentes.
-  - 📜 **Jurisprudência**: Exibição de sentenças análogas (Vencedoras e Perdedoras).
-- **Privacidade**: Tratamento de dados conforme a LGPD e sistema de blur nos resultados antes do pagamento.
-- **Fluxo de Pagamento**: Integração nativa com Mercado Pago para liberação do relatório PDF.
-
-### 🛡️ Segurança e Arquitetura
-- **RAG Vetorial (ChromaDB)**: Busca semântica de alta performance, carregando dados sob demanda para otimização de memória.
-- **Proteção Avançada**:
-  - **CORS Restrito**: Acesso limitado a domínios confiáveis.
-  - **Input Validation**: Proteção contra payloads maliciosos e DoS.
-  - **Logs Rotativos**: Monitoramento profissional de erros e acessos.
-- **Cache Inteligente**: Sistema de TTL para evitar vazamento de memória em análises antigas.
-
----
-
-## 📚 Categorias Atendidas
-
-A IA do IndenizaAi é treinada em bases jurídicas específicas:
-
-1. **✈️ Aéreo**: Atrasos, cancelamentos, extravio de bagagem.
-2. **💳 Bancário**: Tarifas abusivas, juros indevidos.
-3. **🚫 Nome Sujo**: Negativação indevida (SPC/Serasa).
-4. **📱 Telefonia**: Cobranças indevidas, planos alterados.
-5. **🤳 Fraude Digital**: Golpes do Pix, invasão de contas.
-6. **🏥 Plano de Saúde**: Negativas de cobertura e reajustes.
-7. **🛍️ E-commerce**: Atrasos e defeitos.
-8. **💡 Serviços Essenciais**: Corte de luz/água.
-9. **🏠 Imobiliário**: Atraso na entrega de chaves.
-10. **🛡️ Seguradora**: Negativa de cobertura.
-11. **🎓 Ensino**: Problemas com diplomas e cobranças.
-12. **🌐 Redes Sociais**: Recuperação de contas hackeadas.
-13. **💼 Trabalhista**: (Em breve)
+O **IndenizaAi** é uma LegalTech que utiliza Inteligência Artificial para analisar casos cotidianos (voo cancelado, nome negativado, etc.) e estimar a probabilidade de êxito e valor de indenização com base na jurisprudência do TJPR.
 
 ---
 
 ## 🛠️ Stack Tecnológica
 
-### Frontend (SPA)
-- **Core**: React 18 + Vite + TypeScript.
-- **Estilo**: Tailwind CSS + Componentes ShadCN-like.
-- **Analytics**: Meta Pixel e Microsoft Clarity integrados.
-- **Build**: Otimizado para produção.
+### Backend (`/backend`)
+*   **Linguagem:** Python 3.12+
+*   **Framework:** FastAPI (High Performance)
+*   **Banco de Dados:** PostgreSQL (Dados relacionais)
+*   **Vector DB:** ChromaDB (Busca semântica de jurisprudência)
+*   **AI:** Google Gemini (Análise de contexto e classificação)
+*   **Tasks:** BackgroundTasks (Async) + Cron Jobs (Recuperação)
+*   **Libs Principais:** `psycopg2`, `sentence-transformers`, `uvicorn`, `mercadopago`.
 
-### Backend (API REST)
-- **Framework**: Python FastAPI (Async).
-- **Banco de Dados**:
-  - **Vetorial**: ChromaDB (Persistente e Otimizado).
-  - **Relacional**: SQLite (Gestão de Leads).
-- **IA & NLP**:
-  - `Sentence Transformers` (Embeddings Multilíngues).
-  - `Google Gemini Flash` (Classificação e Raciocínio).
-  - `Cross-Encoder` (Reranking de precisão).
-- **Infraestrutura**:
-  - `uvicorn` (Servidor de Aplicação).
-  - `logging` (Sistema de Logs Rotativos).
-  - `cachetools` (Gestão de Memória).
+### Frontend (`/src`)
+*   **Framework:** React 18 + Vite
+*   **Estilização:** TailwindCSS
+*   **Deploy:** Build estático servido por Nginx/Apache.
 
 ---
 
-## ⚙️ Instalação e Execução
+## 🚀 Instalação e Configuração
 
-### Pré-requisitos
-- Node.js 18+ e Python 3.10+
-- Chaves de API: Google Gemini, OpenRouter (Opcional), Mercado Pago.
+### 1. Pré-requisitos
+*   Python 3.12+
+*   Node.js 20+
+*   PostgreSQL 14+
 
-### 1. Backend
+### 2. Backend Setup
+
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
-
-# Instalar dependências
 pip install -r requirements.txt
 
-# Migrar base vetorial (Primeira execução ou atualização de bases)
-python migrate_to_chroma.py
-
-# Configurar .env (Verificar .env.example) e definir SENHA_ADMIN
-# Executar
-uvicorn api:app --reload
+# Configurar Variáveis de Ambiente
+cp .env.example .env
+# Edite o .env com as credenciais do PostgreSQL, Brevo, Google AI e Mercado Pago.
 ```
 
-### 2. Frontend
+### 3. Banco de Dados
 ```bash
+# Crie o banco e usuário no Postgres
+sudo -u postgres psql -c "CREATE USER indeniza WITH PASSWORD 'sua_senha';"
+sudo -u postgres psql -c "CREATE DATABASE indeniza_db OWNER indeniza;"
+
+# A tabela 'leads' será criada automaticamente ao iniciar a API.
+```
+
+### 4. Executando
+```bash
+# Backend (Porta 8000)
+cd backend
+./venv/bin/uvicorn api:app --host 0.0.0.0 --port 8000
+
+# Frontend (Porta 5173 ou Build)
+cd ..
 npm install
-npm run build # Para produção
-npm run dev   # Para desenvolvimento
+npm run dev # ou npm run build
 ```
 
 ---
 
-## 🔐 Privacidade e Segurança
+## ⚙️ Funcionalidades Críticas
 
-- **Aviso de Privacidade**: Página dedicada explicando coleta e uso de dados.
-- **Segurança de Dados**: O sistema não armazena dados sensíveis desnecessários e utiliza canais criptografados.
-- **Isenção de Responsabilidade**: Ferramenta informativa, não substitui advogado.
+### 💳 Webhook de Pagamento
+O endpoint `/api/webhook` processa pagamentos do Mercado Pago de forma **assíncrona**.
+1.  Recebe notificação `payment.created`.
+2.  Responde `200 OK` imediatamente.
+3.  Em background: Valida pagamento -> Gera PDF -> Envia E-mail (Brevo).
+
+### 🔄 Recuperação de Carrinho
+Um script (`backend/recovery.py`) roda via **Cron** a cada 1 hora.
+*   Busca leads criados há >1h que não pagaram.
+*   Envia e-mail único com link de recuperação (`?recover=UUID`).
+*   O frontend restaura a sessão e permite pagamento direto.
+
+### 🛡️ Admin
+Painel administrativo para:
+*   Visualizar KPIs (Conversão, Faturamento).
+*   Exportar CSV de leads.
+*   Reenviar e-mails de clientes manualmente.
+*   Aprovar pagamentos manualmente.
 
 ---
 
-**IndenizaAi © 2026** - *Tecnologia a serviço da cidadania.*
- 
+## 📂 Estrutura de Pastas
+*   `backend/`: Código Python, API, Scripts.
+    *   `api.py`: Aplicação principal.
+    *   `recovery.py`: Script de automação.
+    *   `chroma_db/`: Banco vetorial (persistente).
+*   `src/`: Código React.
+    *   `app/App.tsx`: Lógica principal do frontend.
+*   `dist/`: Build de produção do frontend.
+
+---
+
+**© 2026 IndenizaAi** - Desenvolvido por Claw.
