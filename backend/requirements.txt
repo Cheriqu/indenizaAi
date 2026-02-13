@@ -12,4 +12,5 @@ openai
 reportlab
 cachetools
 python-multipart
-GitPython
+psycopg2-binary
+requests

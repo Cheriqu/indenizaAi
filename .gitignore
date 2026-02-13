@@ -1,12 +1,33 @@
-node_modules
-dist
-.env
-venv
-__pycache__
-*.pkl
-*.db
-.DS_Store
-*.log
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
 
-# Banco Vetorial (Core Business)
+# --- Node.js ---
+node_modules/
+dist/
+build/
+
+# --- Variáveis de Ambiente & Segredos (CRÍTICO) ---
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# --- Banco de Dados & Logs ---
+*.db
+*.sqlite3
+*.log
+backend/recovery.log
+backend/backend.log
+backend/cron.log
+backend/indeniza_db/
 backend/chroma_db/
+
+# --- IDEs & OS ---
+.vscode/
+.idea/
+.DS_Store

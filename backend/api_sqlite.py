@@ -1,6 +1,5 @@
 import os
-import psycopg2
-from psycopg2.extras import DictCursor
+import sqlite3
 import pandas as pd
 import numpy as np
 import mercadopago
@@ -73,17 +72,7 @@ CURRENT_DIR = Path(__file__).resolve().parent
 DB_DIR = CURRENT_DIR
 CHROMA_DB_DIR = DB_DIR / "chroma_db"
 ASSETS_DIR = CURRENT_DIR.parent / "public" / "assets"
-
-# Configurações do PostgreSQL (Carregadas do .env)
-PG_HOST = os.getenv("PG_HOST")
-PG_PORT = os.getenv("PG_PORT")
-PG_USER = os.getenv("PG_USER")
-PG_PASSWORD = os.getenv("PG_PASSWORD")
-PG_DB = os.getenv("PG_DB")
-
-# Validação básica de ambiente
-if not all([PG_HOST, PG_USER, PG_PASSWORD, PG_DB]):
-    logger.error("❌ ERRO CRÍTICO: Variáveis de ambiente do PostgreSQL não configuradas!")
+DB_PATH = DB_DIR / "indeniza.db"
 
 MP_TOKEN = os.getenv("MP_TOKEN")
 OPENAI_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -92,20 +81,7 @@ if not SENHA_ADMIN:
     logger.warning("⚠️ AVISO: SENHA_ADMIN não definida no .env. Admin bloqueado.")
     SENHA_ADMIN = None
 
-# --- FUNÇÃO DE CONEXÃO POSTGRESQL ---
-def get_db_connection():
-    try:
-        conn = psycopg2.connect(
-            host=PG_HOST,
-            port=PG_PORT,
-            user=PG_USER,
-            password=PG_PASSWORD,
-            dbname=PG_DB
-        )
-        return conn
-    except Exception as e:
-        logger.error(f"❌ Erro de conexão com PostgreSQL: {e}")
-        return None
+
 
 # --- FUNÇÃO ENVIAR EMAIL (VIA API BREVO) ---
 def enviar_email_pdf(destinatario, nome, pdf_buffer):
@@ -234,36 +210,21 @@ def load_models():
         # Adicionando mais detalhes para debug
         logger.error(f"Detalhes do erro: {traceback.format_exc()}")
 
-# --- INIT DB (PostgreSQL) ---
+# --- INIT DB ---
 def init_db():
-    conn = get_db_connection()
-    if not conn: return
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS leads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, data_registro DATETIME DEFAULT CURRENT_TIMESTAMP,
+        nome TEXT, email TEXT, whatsapp TEXT, cidade TEXT, resumo_caso TEXT, categoria TEXT, 
+        probabilidade REAL, valor_estimado REAL, pagou BOOLEAN DEFAULT 0, id_analise TEXT,
+        json_analise TEXT
+    )''')
     try:
-        with conn.cursor() as cur:
-            # Tabela já criada na migração, mas garantimos
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS leads (
-                    id SERIAL PRIMARY KEY,
-                    data_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    nome TEXT,
-                    email TEXT,
-                    whatsapp TEXT,
-                    cidade TEXT,
-                    resumo_caso TEXT,
-                    categoria TEXT,
-                    probabilidade REAL,
-                    valor_estimado REAL,
-                    pagou BOOLEAN DEFAULT FALSE,
-                    id_analise TEXT UNIQUE,
-                    json_analise TEXT
-                );
-            """)
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"❌ Erro ao inicializar DB: {e}")
-    finally:
-        conn.close()
+        c.execute("ALTER TABLE leads ADD COLUMN json_analise TEXT")
+    except: pass
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -277,26 +238,20 @@ def formatar_moeda(valor):
 def get_analise_data(id_analise):
     if id_analise in ANALISES_CACHE: return ANALISES_CACHE[id_analise]
     
-    conn = get_db_connection()
-    if not conn: return None
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT json_analise, pagou FROM leads WHERE id_analise = ?", (id_analise,))
+    row = c.fetchone()
+    conn.close()
     
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT json_analise, pagou FROM leads WHERE id_analise = %s", (id_analise,))
-            row = cur.fetchone()
-        
-        if row and row[0]:
-            try:
-                dados = json.loads(row[0])
-                if row[1]: dados["pago"] = True
-                ANALISES_CACHE[id_analise] = dados
-                return dados
-            except Exception as e:
-                logger.error(f"Erro deserializar: {e}")
-    except Exception as e:
-        logger.error(f"Erro DB get_analise: {e}")
-    finally:
-        conn.close()
+    if row and row[0]:
+        try:
+            dados = json.loads(row[0])
+            if row[1]: dados["pago"] = True
+            ANALISES_CACHE[id_analise] = dados
+            return dados
+        except Exception as e:
+            logger.error(f"Erro deserializar: {e}")
     return None
 
 # --- FUNÇÃO GERADORA DE PDF (APRIMORADA) ---
@@ -568,44 +523,29 @@ def analisar_caso(request: AnaliseRequest):
     }
 
     # Salva Lead
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO leads (resumo_caso, categoria, probabilidade, valor_estimado, id_analise, json_analise) 
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (request.relato, categoria, prob, val_medio, id_analise, json.dumps(ANALISES_CACHE[id_analise], ensure_ascii=False)))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erro Insert Lead: {e}")
-    finally:
-        conn.close()
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO leads (resumo_caso, categoria, probabilidade, valor_estimado, id_analise, json_analise) VALUES (?,?,?,?,?,?)",
+            (request.relato, categoria, prob, val_medio, id_analise, json.dumps(ANALISES_CACHE[id_analise], ensure_ascii=False)))
+    conn.commit()
+    conn.close()
 
     return {"id_analise": id_analise, "probabilidade": prob, "valor_estimado": val_medio, "categoria": categoria, "n_casos": 20, "casos": casos_censurados}
 
 @app.post("/api/salvar_lead")
 def salvar_lead(lead: LeadData):
     logger.info(f"💾 Salvando contato: {lead.nome} ({lead.email}) - ID: {lead.id_analise}")
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id FROM leads WHERE id_analise = %s", (lead.id_analise,))
-            if cur.fetchone():
-                cur.execute("UPDATE leads SET nome=%s, email=%s, whatsapp=%s, cidade=%s WHERE id_analise=%s",
-                          (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.id_analise))
-            else:
-                cur.execute("""
-                    INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise))
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"Erro salvar_lead: {e}")
-        return {"status": "error"}
-    finally:
-        conn.close()
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id FROM leads WHERE id_analise = ?", (lead.id_analise,))
+    if c.fetchone():
+        c.execute("UPDATE leads SET nome=?, email=?, whatsapp=?, cidade=? WHERE id_analise=?",
+                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.id_analise))
+    else:
+        c.execute("INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise) VALUES (?,?,?,?,?,?,?,?,?)",
+                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise))
+    conn.commit()
+    conn.close()
     return {"status": "saved"}
 
 @app.post("/api/pagar")
@@ -625,38 +565,6 @@ def gerar_pagamento(lead: LeadData):
         })
         return {"link": pref["response"]["init_point"]}
     except: return {"link": "https://mercadopago.com.br"}
-
-# --- PROCESSAMENTO BACKGROUND ADMIN ---
-def processar_aprovacao_manual_background(ref):
-    """
-    Versão simplificada para ADMIN que não consulta Mercado Pago.
-    Apenas gera PDF e envia e-mail para um ID já aprovado.
-    """
-    logger.info(f"🔄 [ADMIN] Processando aprovação manual background: {ref}")
-    conn = get_db_connection()
-    if not conn: return
-
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT nome, email FROM leads WHERE id_analise = %s", (ref,))
-            lead = cur.fetchone()
-        
-        if lead:
-            nome_cliente, email_cliente = lead
-            dados = get_analise_data(ref)
-            if dados:
-                dados["pago"] = True
-                # Gera PDF
-                pdf_buffer = criar_pdf_bytes(dados, nome_cliente)
-                # Envia Email
-                enviar_email_pdf(email_cliente, nome_cliente, pdf_buffer)
-                logger.info(f"✅ [ADMIN] E-mail enviado com sucesso para {email_cliente}.")
-        else:
-            logger.error(f"❌ [ADMIN] Lead não encontrado: {ref}")
-    except Exception as e:
-        logger.error(f"❌ Erro aprovação manual background: {e}")
-    finally:
-        conn.close()
 
 # --- PROCESSAMENTO BACKGROUND ---
 def processar_sucesso_pagamento(payment_id):
@@ -684,18 +592,14 @@ def processar_sucesso_pagamento(payment_id):
             return
 
         # 2. Atualiza Banco de Dados
-        conn = get_db_connection()
-        if not conn: return
-        try:
-            with conn.cursor() as cur:
-                cur.execute("UPDATE leads SET pagou = TRUE WHERE id_analise = %s", (ref,))
-            conn.commit()
-            
-            with conn.cursor() as cur:
-                cur.execute("SELECT nome, email FROM leads WHERE id_analise = %s", (ref,))
-                lead = cur.fetchone()
-        finally:
-            conn.close()
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("UPDATE leads SET pagou = 1 WHERE id_analise = ?", (ref,))
+        conn.commit()
+        
+        c.execute("SELECT nome, email FROM leads WHERE id_analise = ?", (ref,))
+        lead = c.fetchone()
+        conn.close()
 
         if not lead:
             logger.error(f"❌ Lead não encontrado para ref: {ref}")
@@ -730,35 +634,46 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
     try:
         data = await request.json()
         
+        # Log payload para debug (opcional, remover em produção se muito verboso)
+        # logger.info(f"📩 Webhook recebido: {data}")
+
         if data.get("type") == "payment":
             payment_id = data.get("data", {}).get("id")
             if payment_id:
+                # Delega processamento para background task imediatamente
                 background_tasks.add_task(processar_sucesso_pagamento, payment_id)
                 logger.info(f"⏳ Pagamento {payment_id} enviado para processamento em background.")
         
+        # Responde rápido para o Mercado Pago não dar timeout
         return {"status": "ok"}
         
     except Exception as e:
         logger.error(f"❌ Erro ao receber webhook: {e}")
+        # Mesmo com erro interno, tentamos responder OK para evitar retry loop infinito do MP se for erro de parse
         return {"status": "error", "detail": str(e)}
 
 @app.get("/api/download_pdf/{id_analise}")
 def download_pdf(id_analise: str):
     dados = get_analise_data(id_analise)
-    
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT pagou, nome FROM leads WHERE id_analise = %s", (id_analise,))
-            row = cur.fetchone()
-    finally:
+    if not dados or not dados.get("pago"): 
+        # Double check DB
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT pagou, nome FROM leads WHERE id_analise = ?", (id_analise,))
+        row = c.fetchone()
         conn.close()
-        
-    if not dados or not (dados.get("pago") or (row and row[0])):
-        raise HTTPException(status_code=403, detail="Pagamento pendente")
-    
-    nome = row[1] if row else "Cliente"
-    dados["pago"] = True # Confirma
+        if row and row[0] == 1: 
+            dados["pago"] = True
+            nome = row[1]
+        else:
+            raise HTTPException(status_code=403, detail="Pagamento pendente")
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT nome FROM leads WHERE id_analise = ?", (id_analise,))
+        row = c.fetchone()
+        conn.close()
+        nome = row[0] if row else "Cliente"
 
     pdf_buffer = criar_pdf_bytes(dados, nome)
     return StreamingResponse(pdf_buffer, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=Relatorio_IndenizaAi.pdf"})
@@ -767,31 +682,24 @@ def download_pdf(id_analise: str):
 def verificar_status(id_analise: str):
     dados = get_analise_data(id_analise)
     if dados and dados.get("pago"): return {"pago": True}
-    
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT pagou FROM leads WHERE id_analise = %s", (id_analise,))
-            row = cur.fetchone()
-    finally:
-        conn.close()
-        
-    return {"pago": row and row[0]}
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT pagou FROM leads WHERE id_analise = ?", (id_analise,))
+    row = c.fetchone()
+    conn.close()
+    return {"pago": row and row[0] == 1}
 
 @app.get("/api/relatorio/{id_analise}")
 def obter_relatorio(id_analise: str):
     analise = get_analise_data(id_analise)
     if not analise: raise HTTPException(status_code=404)
-    
     if not analise.get("pago"):
-        conn = get_db_connection()
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT pagou FROM leads WHERE id_analise = %s", (id_analise,))
-                row = cur.fetchone()
-            if row and row[0]: analise["pago"] = True
-        finally:
-            conn.close()
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT pagou FROM leads WHERE id_analise = ?", (id_analise,))
+        row = c.fetchone()
+        conn.close()
+        if row and row[0] == 1: analise["pago"] = True
     
     if analise.get("pago"): return analise
     censurado = analise.copy()
@@ -801,24 +709,17 @@ def obter_relatorio(id_analise: str):
 @app.post("/api/admin/leads")
 def listar_leads(auth: AdminAuth):
     if auth.senha != SENHA_ADMIN: raise HTTPException(status_code=401)
-    
-    conn = get_db_connection()
-    try:
-        df = pd.read_sql_query("SELECT * FROM leads ORDER BY id DESC", conn)
-    finally:
-        conn.close()
-        
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT * FROM leads ORDER BY id DESC", conn)
+    conn.close()
     return df.fillna("").to_dict(orient="records")
 
 @app.post("/api/admin/exportar_csv")
 def admin_export_csv(auth: AdminAuth):
     if auth.senha != SENHA_ADMIN: raise HTTPException(status_code=401)
-    conn = get_db_connection()
-    try:
-        df = pd.read_sql_query("SELECT * FROM leads ORDER BY id DESC", conn)
-    finally:
-        conn.close()
-        
+    conn = sqlite3.connect(DB_PATH)
+    df = pd.read_sql_query("SELECT * FROM leads ORDER BY id DESC", conn)
+    conn.close()
     stream = BytesIO()
     df.to_csv(stream, index=False, encoding='utf-8-sig', sep=';')
     stream.seek(0)
@@ -828,23 +729,28 @@ def admin_export_csv(auth: AdminAuth):
 def teste_aprovar(id_analise: str):
     logger.info(f"🧪 Aprovando (teste) análise: {id_analise}")
     
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE leads SET pagou = TRUE WHERE id_analise = %s", (id_analise,))
-            cur.execute("SELECT nome, email FROM leads WHERE id_analise = %s", (id_analise,))
-            lead = cur.fetchone()
-        conn.commit()
-    finally:
-        conn.close()
+    # 1. Atualiza DB
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE leads SET pagou = 1 WHERE id_analise = ?", (id_analise,))
+    conn.commit()
+    
+    # Pega dados para envio de email
+    c.execute("SELECT nome, email FROM leads WHERE id_analise = ?", (id_analise,))
+    lead = c.fetchone()
+    conn.close()
     
     if not lead:
         logger.error(f"❌ Lead não encontrado para id_analise: {id_analise}")
         raise HTTPException(status_code=404, detail="Lead não encontrado para aprovação")
     
+    # 2. Atualiza Cache / Recupera JSON
     dados_analise = get_analise_data(id_analise)
     if dados_analise:
-        dados_analise["pago"] = True 
+        dados_analise["pago"] = True # Garante status
+        
+        # 3. Envia Email
+        logger.info(f"📧 Tentando enviar e-mail para {lead[1]}...")
         try:
             pdf = criar_pdf_bytes(dados_analise, lead[0])
             enviar_email_pdf(lead[1], lead[0], pdf)
@@ -857,20 +763,49 @@ def teste_aprovar(id_analise: str):
         logger.error(f"❌ Dados da análise não encontrados no cache/DB para id: {id_analise}")
         raise HTTPException(status_code=404, detail="Dados da análise não encontrados")
 
+# --- PROCESSAMENTO BACKGROUND ADMIN ---
+def processar_aprovacao_manual_background(ref):
+    """
+    Versão simplificada para ADMIN que não consulta Mercado Pago.
+    Apenas gera PDF e envia e-mail para um ID já aprovado.
+    """
+    logger.info(f"🔄 [ADMIN] Processando aprovação manual background: {ref}")
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT nome, email FROM leads WHERE id_analise = ?", (ref,))
+        lead = c.fetchone()
+        conn.close()
+
+        if lead:
+            nome_cliente, email_cliente = lead
+            dados = get_analise_data(ref)
+            if dados:
+                dados["pago"] = True
+                # Gera PDF
+                pdf_buffer = criar_pdf_bytes(dados, nome_cliente)
+                # Envia Email
+                enviar_email_pdf(email_cliente, nome_cliente, pdf_buffer)
+                logger.info(f"✅ [ADMIN] E-mail enviado com sucesso para {email_cliente}.")
+        else:
+            logger.error(f"❌ [ADMIN] Lead não encontrado: {ref}")
+    except Exception as e:
+        logger.error(f"❌ Erro aprovação manual background: {e}")
+
 @app.post("/api/admin/reenviar_email")
 def admin_reenviar_email(req: AdminActionRequest, background_tasks: BackgroundTasks):
     if req.senha != SENHA_ADMIN: raise HTTPException(status_code=401)
     
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id FROM leads WHERE id_analise = %s", (req.id_analise,))
-            exists = cur.fetchone()
-    finally:
-        conn.close()
+    # Valida existência
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id FROM leads WHERE id_analise = ?", (req.id_analise,))
+    exists = c.fetchone()
+    conn.close()
     
     if not exists: raise HTTPException(status_code=404, detail="Lead não encontrado")
 
+    # Reutiliza a função de background (mesma lógica de aprovar = reenviar PDF)
     background_tasks.add_task(processar_aprovacao_manual_background, req.id_analise)
 
     return {"status": "ok", "mensagem": "E-mail será reenviado em instantes."}
@@ -882,17 +817,17 @@ def admin_aprovar_manual(req: AdminActionRequest, background_tasks: BackgroundTa
     id_analise = req.id_analise
     logger.info(f"✅ [ADMIN] Aprovação manual solicitada para: {id_analise}")
 
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("UPDATE leads SET pagou = TRUE WHERE id_analise = %s", (id_analise,))
-        conn.commit()
-    finally:
-        conn.close()
+    # 1. Atualiza Banco
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE leads SET pagou = 1 WHERE id_analise = ?", (id_analise,))
+    conn.commit()
+    conn.close()
 
+    # 2. Dispara fluxo
     background_tasks.add_task(processar_aprovacao_manual_background, id_analise)
 
     return {"status": "ok", "mensagem": "Pagamento aprovado. E-mail será enviado em instantes."}
 
 @app.get("/")
-def root(): return {"status": "Online", "db": "PostgreSQL"}
+def root(): return {"status": "Online", "db": "ChromaDB"}

@@ -79,6 +79,13 @@ export default function App() {
     // Initial Load - States
     loadStates().then(setListaEstados);
 
+    // Check for Recovery Link
+    const urlParams = new URLSearchParams(window.location.search);
+    const recoverId = urlParams.get('recover');
+    if (recoverId) {
+      loadFromRecovery(recoverId);
+    }
+
     // History
     const hist = JSON.parse(localStorage.getItem('indeniza_historico') || '[]');
     setHistorico(hist);
@@ -183,6 +190,7 @@ export default function App() {
   const handleAnalyze = async () => {
     if (inputValue.length < 10) return alert("Por favor, descreva melhor o caso.");
     setStep('LOADING');
+    setIsAnalysisUnlocked(false); // RESET: Força o bloqueio para a nova análise exigir salvamento
     try {
       const data = await api.analyze(inputValue);
       setResultData(data);
@@ -222,6 +230,30 @@ export default function App() {
         alert("Pagamento ainda não confirmado.");
       }
     } catch (error) { console.error(error); }
+  };
+
+  const loadFromRecovery = async (id: string) => {
+    setAnaliseId(id);
+    setStep('LOADING');
+    setLoadingText("Recuperando sua análise...");
+    try {
+      const data = await api.getRelatorio(id);
+      if (data) {
+        // Popula os dados
+        setResultData(data);
+        if (data.casos && data.casos[0].link !== '#') {
+          setFullData(data);
+          setStep('SUCCESS');
+        } else {
+          // Se não pagou, libera a tela de resultado mas requer pagamento
+          setIsAnalysisUnlocked(true); // Já vem desbloqueado pois veio do e-mail
+          setStep('RESULT');
+        }
+      }
+    } catch (e) {
+      alert("Análise não encontrada ou expirada.");
+      setStep('INPUT');
+    }
   };
 
   const loadFromHistory = async (id: string) => {
@@ -303,7 +335,14 @@ export default function App() {
 
   // ... (inside renderResult)
 
-  const isFormValid = formData.nome && formData.email && formData.whatsapp && selectedEstado && formData.cidade && formData.aceitaAdvogado;
+  const isFormValid = 
+    formData.nome.trim().length > 2 && 
+    formData.email.includes('@') && 
+    formData.email.includes('.') && 
+    formData.whatsapp.replace(/\D/g, '').length >= 10 && 
+    selectedEstado && 
+    formData.cidade && 
+    formData.aceitaAdvogado;
 
   const handleUnlockAnalysis = async () => {
     if (!isFormValid) return alert("Por favor, preencha todos os campos para ver o resultado.");
