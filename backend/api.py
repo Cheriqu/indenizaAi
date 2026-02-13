@@ -1,5 +1,6 @@
 import os
 import psycopg2
+from psycopg2 import pool
 from psycopg2.extras import DictCursor
 import pandas as pd
 import numpy as np
@@ -93,20 +94,41 @@ if not SENHA_ADMIN:
     logger.warning("⚠️ AVISO: SENHA_ADMIN não definida no .env. Admin bloqueado.")
     SENHA_ADMIN = None
 
-# --- FUNÇÃO DE CONEXÃO POSTGRESQL ---
+# --- CONNECTION POOL (POSTGRESQL) ---
+pg_pool = None
+try:
+    pg_pool = psycopg2.pool.SimpleConnectionPool(
+        minconn=1,
+        maxconn=20,
+        host=PG_HOST,
+        port=PG_PORT,
+        user=PG_USER,
+        password=PG_PASSWORD,
+        dbname=PG_DB
+    )
+    logger.info("✅ PostgreSQL Connection Pool criado com sucesso.")
+except Exception as e:
+    logger.error(f"❌ Erro crítico ao criar pool de conexões: {e}")
+
 def get_db_connection():
+    """Recupera uma conexão do pool."""
     try:
-        conn = psycopg2.connect(
-            host=PG_HOST,
-            port=PG_PORT,
-            user=PG_USER,
-            password=PG_PASSWORD,
-            dbname=PG_DB
-        )
-        return conn
+        if pg_pool:
+            return pg_pool.getconn()
+        else:
+            logger.error("❌ Pool de conexões não está inicializado.")
+            return None
     except Exception as e:
-        logger.error(f"❌ Erro de conexão com PostgreSQL: {e}")
+        logger.error(f"❌ Erro ao obter conexão do pool: {e}")
         return None
+
+def release_db_connection(conn):
+    """Devolve a conexão ao pool com segurança."""
+    if conn and pg_pool:
+        try:
+            pg_pool.putconn(conn)
+        except Exception as e:
+            logger.error(f"⚠️ Erro ao devolver conexão ao pool: {e}")
 
 # --- FUNÇÃO ENVIAR EMAIL (VIA API BREVO) ---
 def enviar_email_pdf(destinatario, nome, pdf_buffer):
@@ -261,16 +283,17 @@ def init_db():
                     probabilidade REAL,
                     valor_estimado REAL,
                     pagou BOOLEAN DEFAULT FALSE,
+                    email_recuperacao_enviado BOOLEAN DEFAULT FALSE,
                     id_analise TEXT UNIQUE,
-                    json_analise TEXT
+                    json_analise JSONB
                 );
             """)
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         logger.error(f"❌ Erro ao inicializar DB: {e}")
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 init_db()
 
@@ -303,7 +326,7 @@ def get_analise_data(id_analise):
     except Exception as e:
         logger.error(f"Erro DB get_analise: {e}")
     finally:
-        conn.close()
+        release_db_connection(conn)
     return None
 
 # --- FUNÇÃO GERADORA DE PDF (APRIMORADA) ---
@@ -470,12 +493,27 @@ def analisar_caso(request: AnaliseRequest):
             logger.info("🔄 Tentando OpenRouter (Fallback)...")
             check = client_or.chat.completions.create(
                 model="google/gemini-2.0-flash-lite-preview-02-05:free", 
-                messages=[{"role": "user", "content": prompt_text + " Responda APENAS JSON: {categoria: str, valido: bool}"}], 
+                messages=[{"role": "user", "content": prompt_text + " Responda APENAS JSON válido, sem markdown."}], 
                 temperature=0.1
             )
-            raw_json = re.search(r'\{.*\}', check.choices[0].message.content, re.DOTALL).group(0)
-            data_dict = json.loads(raw_json)
-            resp_obj = ClassificacaoCaso(**data_dict) # Converte dict para Pydantic
+            
+            content = check.choices[0].message.content
+            
+            # 1. Remove Markdown Code Blocks se existirem
+            if "```" in content:
+                content = re.sub(r"```(?:json)?\n?|\n?```", "", content)
+            
+            # 2. Encontra o primeiro '{' e o último '}'
+            start = content.find("{")
+            end = content.rfind("}")
+            
+            if start != -1 and end != -1:
+                raw_json = content[start : end + 1]
+                data_dict = json.loads(raw_json)
+                resp_obj = ClassificacaoCaso(**data_dict)
+            else:
+                raise ValueError("JSON bounds not found")
+                
         except Exception as e:
             logger.error(f"❌ Falha OpenRouter: {e}")
 
@@ -580,6 +618,9 @@ def analisar_caso(request: AnaliseRequest):
 
     # Salva Lead
     conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com banco de dados")
+    
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -588,10 +629,10 @@ def analisar_caso(request: AnaliseRequest):
             """, (request.relato, categoria, prob, val_medio, id_analise, json.dumps(ANALISES_CACHE[id_analise], ensure_ascii=False)))
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         logger.error(f"Erro Insert Lead: {e}")
     finally:
-        conn.close()
+        release_db_connection(conn)
 
     return {"id_analise": id_analise, "probabilidade": prob, "valor_estimado": val_medio, "categoria": categoria, "n_casos": 20, "casos": casos_censurados}
 
@@ -599,6 +640,9 @@ def analisar_caso(request: AnaliseRequest):
 def salvar_lead(lead: LeadData):
     logger.info(f"💾 Salvando contato: {lead.nome} ({lead.email}) - ID: {lead.id_analise}")
     conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM leads WHERE id_analise = %s", (lead.id_analise,))
@@ -612,11 +656,11 @@ def salvar_lead(lead: LeadData):
                 """, (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise))
         conn.commit()
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         logger.error(f"Erro salvar_lead: {e}")
         return {"status": "error"}
     finally:
-        conn.close()
+        release_db_connection(conn)
     return {"status": "saved"}
 
 @app.post("/api/pagar")
@@ -667,7 +711,7 @@ def processar_aprovacao_manual_background(ref):
     except Exception as e:
         logger.error(f"❌ Erro aprovação manual background: {e}")
     finally:
-        conn.close()
+        release_db_connection(conn)
 
 # --- PROCESSAMENTO BACKGROUND ---
 def processar_sucesso_pagamento(payment_id):
@@ -706,7 +750,7 @@ def processar_sucesso_pagamento(payment_id):
                 cur.execute("SELECT nome, email FROM leads WHERE id_analise = %s", (ref,))
                 lead = cur.fetchone()
         finally:
-            conn.close()
+            release_db_connection(conn)
 
         if not lead:
             logger.error(f"❌ Lead não encontrado para ref: {ref}")
@@ -758,12 +802,15 @@ def download_pdf(id_analise: str):
     dados = get_analise_data(id_analise)
     
     conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="DB Error")
+    
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT pagou, nome FROM leads WHERE id_analise = %s", (id_analise,))
             row = cur.fetchone()
     finally:
-        conn.close()
+        release_db_connection(conn)
         
     if not dados or not (dados.get("pago") or (row and row[0])):
         raise HTTPException(status_code=403, detail="Pagamento pendente")
@@ -780,12 +827,14 @@ def verificar_status(id_analise: str):
     if dados and dados.get("pago"): return {"pago": True}
     
     conn = get_db_connection()
+    if not conn: return {"pago": False}
+    
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT pagou FROM leads WHERE id_analise = %s", (id_analise,))
             row = cur.fetchone()
     finally:
-        conn.close()
+        release_db_connection(conn)
         
     return {"pago": row and row[0]}
 
@@ -796,13 +845,14 @@ def obter_relatorio(id_analise: str):
     
     if not analise.get("pago"):
         conn = get_db_connection()
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT pagou FROM leads WHERE id_analise = %s", (id_analise,))
-                row = cur.fetchone()
-            if row and row[0]: analise["pago"] = True
-        finally:
-            conn.close()
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT pagou FROM leads WHERE id_analise = %s", (id_analise,))
+                    row = cur.fetchone()
+                if row and row[0]: analise["pago"] = True
+            finally:
+                release_db_connection(conn)
     
     if analise.get("pago"): return analise
     censurado = analise.copy()
@@ -814,10 +864,18 @@ def listar_leads(auth: AdminAuth):
     if auth.senha != SENHA_ADMIN: raise HTTPException(status_code=401)
     
     conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Database Error")
+    
     try:
+        # Pandas read_sql não fecha a conexão sozinha, mas também não a devolve ao pool.
+        # Precisamos garantir o release.
         df = pd.read_sql_query("SELECT * FROM leads ORDER BY id DESC", conn)
+    except Exception as e:
+        logger.error(f"Erro admin leads: {e}")
+        return []
     finally:
-        conn.close()
+        release_db_connection(conn)
         
     return df.fillna("").to_dict(orient="records")
 
@@ -825,10 +883,12 @@ def listar_leads(auth: AdminAuth):
 def admin_export_csv(auth: AdminAuth):
     if auth.senha != SENHA_ADMIN: raise HTTPException(status_code=401)
     conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500)
     try:
         df = pd.read_sql_query("SELECT * FROM leads ORDER BY id DESC", conn)
     finally:
-        conn.close()
+        release_db_connection(conn)
         
     stream = BytesIO()
     df.to_csv(stream, index=False, encoding='utf-8-sig', sep=';')
@@ -840,6 +900,7 @@ def teste_aprovar(id_analise: str):
     logger.info(f"🧪 Aprovando (teste) análise: {id_analise}")
     
     conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500)
     try:
         with conn.cursor() as cur:
             cur.execute("UPDATE leads SET pagou = TRUE WHERE id_analise = %s", (id_analise,))
@@ -847,7 +908,7 @@ def teste_aprovar(id_analise: str):
             lead = cur.fetchone()
         conn.commit()
     finally:
-        conn.close()
+        release_db_connection(conn)
     
     if not lead:
         logger.error(f"❌ Lead não encontrado para id_analise: {id_analise}")
@@ -873,12 +934,13 @@ def admin_reenviar_email(req: AdminActionRequest, background_tasks: BackgroundTa
     if req.senha != SENHA_ADMIN: raise HTTPException(status_code=401)
     
     conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500)
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM leads WHERE id_analise = %s", (req.id_analise,))
             exists = cur.fetchone()
     finally:
-        conn.close()
+        release_db_connection(conn)
     
     if not exists: raise HTTPException(status_code=404, detail="Lead não encontrado")
 
@@ -894,12 +956,13 @@ def admin_aprovar_manual(req: AdminActionRequest, background_tasks: BackgroundTa
     logger.info(f"✅ [ADMIN] Aprovação manual solicitada para: {id_analise}")
 
     conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500)
     try:
         with conn.cursor() as cur:
             cur.execute("UPDATE leads SET pagou = TRUE WHERE id_analise = %s", (id_analise,))
         conn.commit()
     finally:
-        conn.close()
+        release_db_connection(conn)
 
     background_tasks.add_task(processar_aprovacao_manual_background, id_analise)
 
