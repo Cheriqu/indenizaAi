@@ -84,7 +84,7 @@ def enviar_email_recuperacao(destinatario, nome, valor_estimado, probabilidade, 
     payload = {
         "sender": {"name": "Equipe Indeniza Aí", "email": "contato@indenizaapp.com.br"},
         "to": [{"email": destinatario, "name": nome_tratado}],
-        "subject": f"Você esqueceu {valor_fmt} para trás? ⚖️",
+        "subject": f"Você esqueceu {valor_fmt} para trás ⚖️",
         "htmlContent": html_content
     }
     
