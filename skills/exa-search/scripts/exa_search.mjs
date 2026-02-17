@@ -1,125 +1,102 @@
-#!/usr/bin/env node
-/* eslint-disable no-console */
+// skills/exa-search/scripts/exa_search.mjs
+import Exa from 'exa-js';
+import dotenv from 'dotenv';
+import path from 'path';
 
-import process from "node:process";
+// Load .env from workspace root
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-function usage(exitCode = 0) {
-  console.error(
-    [
-      "Usage:",
-      '  exa_search.mjs "<query>" [--count N] [--text] [--highlights] [--type auto|neural|keyword] [--start YYYY-MM-DD] [--end YYYY-MM-DD]',
-      "",
-      "Env:",
-      "  EXA_API_KEY   (required)",
-    ].join("\n"),
-  );
-  process.exit(exitCode);
+const apiKey = process.env.EXA_API_KEY;
+
+if (!apiKey) {
+  console.error('Error: EXA_API_KEY is not defined in .env or environment.');
+  console.error('Sign up for a free key at https://exa.ai/login and add EXA_API_KEY=your_key to .env');
+  process.exit(1);
 }
 
-function parseArgs(argv) {
-  const args = { query: null, count: 5, text: false, highlights: false, type: "auto", start: null, end: null };
+const exa = new Exa(apiKey);
 
-  const positionals = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--help" || a === "-h") usage(0);
-    if (!a.startsWith("--")) {
-      positionals.push(a);
-      continue;
+async function runSearch() {
+  const args = process.argv.slice(2);
+  const mode = args[0]; // search, crawl, code, etc.
+  const queryOrUrl = args[1];
+  const options = args[2] ? JSON.parse(args[2]) : {};
+
+  try {
+    let result;
+    switch (mode) {
+      case 'search':
+        console.log(`Searching Exa for: "${queryOrUrl}"...`);
+        result = await exa.searchAndContents(queryOrUrl, {
+          numResults: options.numResults || 5,
+          useAutoprompt: true,
+          type: 'keyword', // Default to keyword search
+          ...options
+        });
+        break;
+
+      case 'neural': // Semantic/Neural search (Exa default)
+        console.log(`Neural search for: "${queryOrUrl}"...`);
+        result = await exa.searchAndContents(queryOrUrl, {
+          numResults: options.numResults || 5,
+          useAutoprompt: true,
+          type: 'neural',
+          ...options
+        });
+        break;
+
+      case 'crawl':
+        console.log(`Crawling URL: ${queryOrUrl}...`);
+        // crawl is actually getContents for specific IDs/URLs in Exa context usually
+        // but let's assume they want contents of a specific URL if provided
+        // or search specific site.
+        // For direct URL content fetching, exa.getContents([url]) works best.
+        result = await exa.getContents([queryOrUrl], {
+            text: true
+        });
+        break;
+
+       case 'find-similar':
+        console.log(`Finding similar to: ${queryOrUrl}...`);
+        result = await exa.findSimilarAndContents(queryOrUrl, {
+            numResults: options.numResults || 5,
+            ...options
+        });
+        break;
+
+      default:
+        console.error(`Unknown mode: ${mode}`);
+        console.error('Usage: node exa_search.mjs <mode> <query/url> [options_json]');
+        process.exit(1);
     }
-    const key = a.slice(2);
-    if (key === "text") args.text = true;
-    else if (key === "highlights") args.highlights = true;
-    else if (key === "count") {
-      const v = argv[++i];
-      if (!v) usage(2);
-      args.count = Number(v);
-    } else if (key === "type") {
-      const v = argv[++i];
-      if (!v) usage(2);
-      args.type = v;
-    } else if (key === "start") {
-      const v = argv[++i];
-      if (!v) usage(2);
-      args.start = v;
-    } else if (key === "end") {
-      const v = argv[++i];
-      if (!v) usage(2);
-      args.end = v;
+
+    // Output strictly JSON for OpenClaw to parse if needed, or readable text
+    if (options.jsonOutput) {
+        console.log(JSON.stringify(result, null, 2));
     } else {
-      console.error(`Unknown flag: ${a}`);
-      usage(2);
+        // Human readable summary
+        if (result.results) {
+            result.results.forEach((item, index) => {
+                console.log(`\n--- Result ${index + 1} ---`);
+                console.log(`Title: ${item.title || 'No Title'}`);
+                console.log(`URL: ${item.url}`);
+                if (item.publishedDate) console.log(`Date: ${item.publishedDate}`);
+                if (item.author) console.log(`Author: ${item.author}`);
+                if (item.text) {
+                    // Truncate text for readability in console
+                    const snippet = item.text.slice(0, 500).replace(/\n/g, ' ');
+                    console.log(`Snippet: ${snippet}...`);
+                }
+            });
+        } else {
+            console.log(JSON.stringify(result, null, 2));
+        }
     }
-  }
 
-  if (positionals.length === 0) usage(2);
-  // Special-case help so we don't require EXA_API_KEY just to print usage.
-  if (positionals.length === 1 && (positionals[0] === "--help" || positionals[0] === "-h")) usage(0);
-  args.query = positionals.join(" ");
-  if (!Number.isFinite(args.count) || args.count < 1 || args.count > 25) {
-    console.error("--count must be 1..25");
-    process.exit(2);
-  }
-  return args;
-}
-
-function toIsoDateOrNull(dateStr) {
-  if (!dateStr) return null;
-  // Accept YYYY-MM-DD; interpret as date-only.
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    console.error(`Invalid date: ${dateStr} (expected YYYY-MM-DD)`);
-    process.exit(2);
-  }
-  return `${dateStr}T00:00:00.000Z`;
-}
-
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-
-  const apiKey = process.env.EXA_API_KEY;
-  if (!apiKey) {
-    console.error("Missing EXA_API_KEY in environment.");
-    usage(2);
-  }
-
-  const body = {
-    query: args.query,
-    type: args.type,
-    numResults: args.count,
-    contents: {
-      text: Boolean(args.text),
-      highlights: Boolean(args.highlights),
-    },
-  };
-
-  const startDate = toIsoDateOrNull(args.start);
-  const endDate = toIsoDateOrNull(args.end);
-  if (startDate || endDate) {
-    body.startPublishedDate = startDate ?? undefined;
-    body.endPublishedDate = endDate ?? undefined;
-  }
-
-  const res = await fetch("https://api.exa.ai/search", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      accept: "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  const text = await res.text();
-  if (!res.ok) {
-    console.error(`Exa API error (${res.status}): ${text}`);
+  } catch (error) {
+    console.error('Exa API Error:', error.message);
     process.exit(1);
   }
-
-  // Return raw JSON so downstream tooling can parse.
-  process.stdout.write(text);
 }
 
-main().catch((err) => {
-  console.error(err?.stack || String(err));
-  process.exit(1);
-});
+runSearch();

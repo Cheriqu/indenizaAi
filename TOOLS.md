@@ -37,4 +37,13 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 
 ---
 
-Add whatever helps you do your job. This is your cheat sheet.
+### Memory Search (QMD)
+- **Local:** Use `qmd` via `exec` tool.
+- **Search:** `export PATH="/root/.bun/bin:$PATH" && qmd search "query"` (Fast, BM25).
+- **Vector Search:** `export PATH="/root/.bun/bin:$PATH" && qmd vsearch "query"` (Semantic, slower).
+- **Index:** `/root/.openclaw/workspace` (Auto-updated hourly via cron).
+### Memory Search (QMD)
+- **Local:** Use `qmd` via `exec` tool.
+- **Search:** `export PATH="/root/.bun/bin:$PATH" && qmd search "query"` (Fast, BM25).
+- **Vector Search:** `export PATH="/root/.bun/bin:$PATH" && qmd vsearch "query"` (Semantic, slower).
+- **Index:** `/root/.openclaw/workspace` (Auto-updated hourly via cron).

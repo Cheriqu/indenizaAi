@@ -22,6 +22,7 @@ Status do Projeto: **Fase de Escala e Otimização**
 - [x] **Correção de Fluxo:** "Nova Análise" funciona corretamente.
 - [x] **Validação de Formulário:** Bloqueio de envio com campos vazios.
 - [x] **Link de Recuperação:** Suporte a `?recover=UUID`.
+- [x] **Entrada de Áudio (Voz):** Suporte a relatos por voz (transcrição via Google Gemini).
 
 ---
 

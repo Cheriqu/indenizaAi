@@ -19,7 +19,7 @@ from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
 from io import BytesIO
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, UploadFile, File
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -858,6 +858,220 @@ def obter_relatorio(id_analise: str):
     censurado = analise.copy()
     censurado["casos"] = [{"resumo": "🔒 Conteúdo bloqueado...", "valor": 0, "data": "-", "link": "#", "tipo_resultado": "DERROTA"}] * 3
     return censurado
+
+@app.post("/api/transcrever")
+async def transcrever_audio(file: UploadFile = File(...)):
+    """
+    Recebe um arquivo de áudio (webm, mp3, wav, m4a), salva temporariamente
+    e envia para o Google Gemini para transcrição.
+    """
+    logger.info(f"🎙️ Recebendo áudio para transcrição: {file.filename} ({file.content_type})")
+
+    GOOGLE_KEY = os.getenv("GOOGLE_API_KEY")
+    if not GOOGLE_KEY:
+        raise HTTPException(status_code=500, detail="Chave da IA não configurada.")
+
+    # Validação de tamanho (máx 25MB)
+    MAX_SIZE = 25 * 1024 * 1024
+    content = await file.read()
+    
+    if len(content) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="Arquivo de áudio muito grande (máx 25MB).")
+
+    try:
+        # Salva arquivo temporário para envio
+        temp_filename = f"/tmp/{uuid.uuid4()}_{file.filename}"
+        with open(temp_filename, "wb") as f:
+            f.write(content)
+
+        client = genai.Client(api_key=GOOGLE_KEY)
+        
+        # Upload para o Google AI File API
+        logger.info("⬆️ Enviando áudio para Google AI...")
+        uploaded_file = client.files.upload(path=temp_filename)
+
+        # Prompt para transcrição
+        prompt = "Transcreva este áudio com precisão para o português do Brasil. Retorne APENAS o texto transcrito, sem comentários adicionais."
+
+        logger.info("🧠 Processando transcrição com Gemini 1.5 Flash...")
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=[prompt, uploaded_file]
+        )
+
+        # Limpeza
+        os.remove(temp_filename)
+        # Opcional: deletar arquivo da nuvem do Google para não acumular (embora expirem sozinhos)
+        # client.files.delete(name=uploaded_file.name)
+
+        if response.text:
+            logger.info("✅ Transcrição concluída com sucesso.")
+            return {"texto": response.text.strip()}
+        else:
+            logger.warning("⚠️ Transcrição retornou vazia.")
+            return {"texto": ""}
+
+    except Exception as e:
+        logger.error(f"❌ Erro na transcrição: {e}")
+        # Tenta limpar arquivo temporário em caso de erro
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
+        raise HTTPException(status_code=500, detail="Erro ao transcrever áudio.")
+
+from typing import List, Optional
+import datetime
+
+# ... (outros imports) ...
+
+class LogActivity(BaseModel):
+    action: str
+    details: dict
+    status: str = "SUCCESS"
+
+# --- HELPERS DASHBOARD ---
+
+def registrar_atividade(action: str, details: dict, status: str = "SUCCESS"):
+    """
+    Registra uma ação na tabela activity_logs.
+    Pode ser chamada de qualquer lugar do backend.
+    """
+    conn = get_db_connection()
+    if not conn: return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO activity_logs (action, details, status)
+                VALUES (%s, %s, %s)
+            """, (action, json.dumps(details, ensure_ascii=False), status))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"❌ Erro ao registrar atividade: {e}")
+    finally:
+        release_db_connection(conn)
+
+# --- ENDPOINTS DASHBOARD ---
+
+@app.get("/api/dashboard/activity")
+def get_activity_logs(limit: int = 50, offset: int = 0):
+    """Retorna histórico de atividades."""
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Database error")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, timestamp, action, details, status 
+                FROM activity_logs 
+                ORDER BY timestamp DESC 
+                LIMIT %s OFFSET %s
+            """, (limit, offset))
+            rows = cur.fetchall()
+            
+            logs = []
+            for r in rows:
+                logs.append({
+                    "id": r[0],
+                    "timestamp": r[1].isoformat(),
+                    "action": r[2],
+                    "details": r[3],
+                    "status": r[4]
+                })
+            return logs
+    finally:
+        release_db_connection(conn)
+
+@app.get("/api/dashboard/calendar")
+def get_scheduled_tasks():
+    """Retorna tarefas agendadas (simuladas do banco)."""
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Database error")
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, task_name, schedule_cron, last_run, next_run, active FROM scheduled_tasks")
+            rows = cur.fetchall()
+            tasks = []
+            for r in rows:
+                tasks.append({
+                    "id": r[0],
+                    "title": r[1],
+                    "cron": r[2],
+                    "last_run": r[3].isoformat() if r[3] else None,
+                    "next_run": r[4].isoformat() if r[4] else None,
+                    "active": r[5]
+                })
+            return tasks
+    finally:
+        release_db_connection(conn)
+
+@app.get("/api/dashboard/search")
+def global_search(q: str):
+    """
+    Busca global:
+    1. Pesquisa no banco de dados (Leads)
+    2. Pesquisa em arquivos de memória (Markdown)
+    """
+    results = []
+    
+    # 1. Busca no Banco de Dados (Leads)
+    conn = get_db_connection()
+    if conn:
+        try:
+            with conn.cursor() as cur:
+                term = f"%{q}%"
+                cur.execute("""
+                    SELECT id, nome, email, resumo_caso, categoria 
+                    FROM leads 
+                    WHERE nome ILIKE %s OR email ILIKE %s OR resumo_caso ILIKE %s
+                    LIMIT 5
+                """, (term, term, term))
+                rows = cur.fetchall()
+                for r in rows:
+                    results.append({
+                        "type": "lead",
+                        "title": f"Lead: {r[1]} ({r[4]})",
+                        "content": r[3][:150] + "...",
+                        "link": f"/admin/leads/{r[0]}" # Link simbólico
+                    })
+        except Exception as e:
+            logger.error(f"Search DB error: {e}")
+        finally:
+            release_db_connection(conn)
+
+    # 2. Busca em Arquivos de Memória (Grep Simulado)
+    try:
+        # Define diretórios seguros para busca
+        safe_dirs = ["/root/.openclaw/workspace", "/root/.openclaw/workspace/memory"]
+        found_files = []
+        
+        # Comando grep simples para buscar termo nos arquivos .md
+        # -r (recursivo), -i (case insensitive), -l (apenas nomes de arquivos)
+        cmd = f"grep -ril '{q}' {safe_dirs[1]} --include='*.md' | head -n 5"
+        stream = os.popen(cmd)
+        files = stream.read().strip().split('\n')
+        
+        for f in files:
+            if not f: continue
+            # Lê um trecho do arquivo para mostrar contexto
+            try:
+                with open(f, 'r', encoding='utf-8', errors='ignore') as file_content:
+                    text = file_content.read()
+                    # Encontra índice do termo
+                    idx = text.lower().find(q.lower())
+                    start = max(0, idx - 50)
+                    end = min(len(text), idx + 100)
+                    snippet = text[start:end].replace('\n', ' ')
+                    
+                    results.append({
+                        "type": "memory",
+                        "title": f"Arquivo: {os.path.basename(f)}",
+                        "content": f"...{snippet}...",
+                        "link": "#"
+                    })
+            except: pass
+            
+    except Exception as e:
+        logger.error(f"Search Files error: {e}")
+
+    return results
 
 @app.post("/api/admin/leads")
 def listar_leads(auth: AdminAuth):

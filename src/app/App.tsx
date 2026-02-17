@@ -47,6 +47,7 @@ import Testimonials from "@/app/components/Testimonials";
 import { maskPhone } from "@/utils/maskPhone";
 import { api, loadStates, loadCitiesByState } from "@/services/api";
 import { Footer } from "@/app/components/Footer";
+import AudioRecorder from "@/app/components/AudioRecorder"; // Importar componente
 
 export default function App() {
   // STATE: Flow Control
@@ -284,10 +285,15 @@ export default function App() {
   const renderInputForm = () => (
     <div className="form-card bg-white rounded-3xl p-6 md:p-8 shadow-xl relative animate-in fade-in zoom-in duration-300">
       <div className="mb-5">
-        <label className="block text-sm md:text-base font-semibold text-[#0f172a] mb-2 flex justify-between">
-          Conte o que aconteceu com você:
-          <span className={`text-xs ${inputValue.length > 50 ? 'text-green-500' : 'text-gray-400'}`}>{inputValue.length} chars</span>
-        </label>
+        <div className="flex justify-between items-center mb-2">
+          <label className="block text-sm md:text-base font-semibold text-[#0f172a]">
+            Conte o que aconteceu com você:
+          </label>
+          <div className="flex items-center gap-2">
+            <AudioRecorder onTranscription={(txt) => setInputValue(txt)} />
+            <span className={`text-xs ${inputValue.length > 50 ? 'text-green-500' : 'text-gray-400'}`}>{inputValue.length} chars</span>
+          </div>
+        </div>
         <textarea
           className="form-input w-full min-h-[120px] bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-sm md:text-base text-[#0f172a] resize-none transition-all duration-300 focus:outline-none focus:border-[#1c80b2] focus:ring-2 focus:ring-[#1c80b2]/20 shadow-inner"
           placeholder="Ex: Meu voo foi cancelado sem aviso prévio, descobri um empréstimo no meu nome que não fiz, fui cobrado por taxas bancárias abusivas..."

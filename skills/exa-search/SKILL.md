@@ -1,28 +1,46 @@
 ---
 name: exa-search
-description: Use Exa (exa.ai) Search API to search the web and return structured results (title/url/snippet/text) via a local Node script. Trigger when the user asks to enable Exa search, configure Exa API key, or perform web search using Exa.
-metadata: {"openclaw":{"emoji":"🔎","requires":{"bins":["node"],"env":["EXA_API_KEY"]},"primaryEnv":"EXA_API_KEY","homepage":"https://exa.ai/docs"}}
+description: Powerful neural search and research engine by Exa.ai.
 ---
 
-# Exa Search
+# Exa Search Skill
 
-Use Exa’s Search API via the bundled script.
+Use this skill when you need deep research capabilities beyond standard web search. Exa excels at finding specific technical content, code snippets, academic papers, and "hard to find" information using neural search.
 
-## Requirements
+## Tools
 
-- Set `EXA_API_KEY` in the Gateway environment (recommended) or in `~/.openclaw/.env`.
+### exa_search
 
-## Commands
+Perform a keyword or neural search using Exa.
 
-- Run a search:
-  - `node {baseDir}/scripts/exa_search.mjs "<query>" --count 5`
+**Usage:**
+```bash
+node skills/exa-search/scripts/exa_search.mjs search "your query here"
+```
 
-- Include page text in results (costs more):
-  - `node {baseDir}/scripts/exa_search.mjs "<query>" --count 5 --text`
+**Options:**
+- `--neural`: Use neural/semantic search instead of keyword (better for complex queries).
+- `--num <number>`: Number of results (default 5).
 
-- Narrow by time window:
-  - `--start 2025-01-01 --end 2026-02-04`
+### exa_crawl
 
-## Notes
+Retrieve the full content of a specific URL or perform a targeted crawl.
 
-- This skill does not modify `web_search`; it provides an Exa-backed alternative you can invoke when you specifically want Exa.
+**Usage:**
+```bash
+node skills/exa-search/scripts/exa_search.mjs crawl "https://example.com/article"
+```
+
+### exa_similar
+
+Find pages similar to a given URL. Great for expanding research from a single good source.
+
+**Usage:**
+```bash
+node skills/exa-search/scripts/exa_search.mjs find-similar "https://good-source.com"
+```
+
+## Setup
+
+1. Get an API Key from [Exa.ai](https://exa.ai).
+2. Add `EXA_API_KEY=your_key` to your `.env` file in the workspace root.

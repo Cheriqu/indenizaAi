@@ -37,6 +37,21 @@ export const api = {
         return await response.json();
     },
 
+    transcrever: async (file: File) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        const response = await fetch(`${API_URL}/transcrever`, {
+            method: 'POST',
+            body: formData, // fetch sets content-type automatically for FormData
+        });
+        
+        if (!response.ok) {
+            throw new Error("Erro na transcrição");
+        }
+        return await response.json();
+    },
+
     getRelatorio: async (id: string) => {
         const response = await fetch(`${API_URL}/relatorio/${id}`);
         if (!response.ok) throw new Error("Erro ao buscar relatório");
