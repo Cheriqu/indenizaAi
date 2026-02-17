@@ -48,6 +48,7 @@ import { maskPhone } from "@/utils/maskPhone";
 import { api, loadStates, loadCitiesByState } from "@/services/api";
 import { Footer } from "@/app/components/Footer";
 import AudioRecorder from "@/app/components/AudioRecorder"; // Importar componente
+import { trackEvent, trackError, tagSession } from "@/utils/clarity";
 
 export default function App() {
   // STATE: Flow Control
@@ -115,8 +116,11 @@ export default function App() {
     }
   }, [selectedEstado]);
 
-  // TRACKING: Dispara Purchase quando o pagamento é confirmado
+  // TRACKING: Dispara Purchase quando o pagamento é confirmado e rastreia passos
   useEffect(() => {
+    // Rastreia o passo atual
+    tagSession("current_step", step);
+    
     if (step === 'SUCCESS') {
       // @ts-ignore
       if (window.fbq) {
@@ -128,11 +132,8 @@ export default function App() {
           content_type: 'product'
         });
       }
-      // @ts-ignore
-      if (window.clarity) {
-        // @ts-ignore
-        window.clarity('set', 'conversion', 'purchase');
-      }
+      tagSession("conversion", "purchase");
+      trackEvent("purchase_success");
     }
   }, [step]);
 
@@ -189,33 +190,50 @@ export default function App() {
   // --- ACTIONS ---
 
   const handleAnalyze = async () => {
-    if (inputValue.length < 10) return alert("Por favor, descreva melhor o caso.");
+    if (inputValue.length < 10) {
+      trackEvent("error_input_too_short");
+      return alert("Por favor, descreva melhor o caso.");
+    }
     setStep('LOADING');
     setIsAnalysisUnlocked(false); // RESET: Força o bloqueio para a nova análise exigir salvamento
     try {
       const data = await api.analyze(inputValue);
       setResultData(data);
       setAnaliseId(data.id_analise);
+      trackEvent("analysis_completed");
       setStep('RESULT');
     } catch (error: any) {
+      trackError("analysis_failed", error.message || "Erro desconhecido");
       alert(error.message || "Erro desconhecido.");
       setStep('INPUT');
     }
   };
 
   const handlePayment = async () => {
-    if (!formData.nome || !formData.email) return alert("Preencha seus dados para continuar.");
-    if (!formData.aceitaAdvogado) return alert("Por favor, aceite o termo de contato para continuar.");
+    if (!formData.nome || !formData.email) {
+      trackEvent("payment_form_incomplete");
+      return alert("Preencha seus dados para continuar.");
+    }
+    if (!formData.aceitaAdvogado) {
+      trackEvent("payment_terms_not_accepted");
+      return alert("Por favor, aceite o termo de contato para continuar.");
+    }
 
     setAguardandoPagamento(true);
+    trackEvent("payment_initiated");
+    
     try {
       const payload = {
         ...formData, resumo: inputValue, categoria: resultData.categoria,
         prob: resultData.probabilidade, valor: resultData.valor_estimado, aceita_advogado: formData.aceitaAdvogado, id_analise: analiseId
       };
       const data = await api.pagar(payload);
-      if (data.link) window.open(data.link, '_blank');
-    } catch (error) {
+      if (data.link) {
+        trackEvent("payment_link_opened");
+        window.open(data.link, '_blank');
+      }
+    } catch (error: any) {
+      trackError("payment_generation_failed", error.message || "Unknown");
       alert("Erro ao gerar pagamento.");
       setAguardandoPagamento(false);
     }
@@ -351,9 +369,14 @@ export default function App() {
     formData.aceitaAdvogado;
 
   const handleUnlockAnalysis = async () => {
-    if (!isFormValid) return alert("Por favor, preencha todos os campos para ver o resultado.");
+    if (!isFormValid) {
+      trackEvent("unlock_form_invalid");
+      return alert("Por favor, preencha todos os campos para ver o resultado.");
+    }
 
     setIsSaving(true);
+    trackEvent("unlock_analysis_attempt");
+
     try {
       const payload = {
         nome: formData.nome,
@@ -369,8 +392,10 @@ export default function App() {
       };
       await api.saveLead(payload);
       setIsAnalysisUnlocked(true);
-    } catch (error) {
+      trackEvent("lead_captured_success");
+    } catch (error: any) {
       console.error(error);
+      trackError("lead_save_failed", error.message || "Unknown");
       alert("Erro ao salvar contato. Tente novamente.");
     } finally {
       setIsSaving(false);
