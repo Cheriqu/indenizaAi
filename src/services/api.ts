@@ -1,64 +1,75 @@
+import axios from 'axios';
 
 // URL da API
-const API_URL = import.meta.env.PROD ? '/api' : 'http://localhost:8000/api';
+// Em produção, o Nginx serve o frontend e faz proxy de /api para o backend na porta 8000
+// Em dev, o Vite faz proxy ou usamos localhost:8000 direto
+const BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:8000/api';
 
+// Instância do Axios
+const axiosInstance = axios.create({
+    baseURL: BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
+// Mantemos a compatibilidade com o objeto `api` antigo, mas agora ele usa o axiosInstance internamente
+// E também expomos o próprio axiosInstance como padrão para chamadas genéricas (.get, .post)
 export const api = {
+    // Métodos Genéricos (para MissionControl e outros componentes novos)
+    get: (url: string, config?: any) => axiosInstance.get(url, config),
+    post: (url: string, data?: any, config?: any) => axiosInstance.post(url, data, config),
+    put: (url: string, data?: any, config?: any) => axiosInstance.put(url, data, config),
+    delete: (url: string, config?: any) => axiosInstance.delete(url, config),
+
+    // Métodos Específicos do Domínio (Mantidos para compatibilidade)
     analyze: async (relato: string) => {
-        const response = await fetch(`${API_URL}/analisar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ relato })
-        });
-        const data = await response.json();
-        if (data.erro) throw new Error(data.erro);
-        return data; // { id_analise, prob, valor, result... }
+        try {
+            const { data } = await axiosInstance.post('/analisar', { relato });
+            if (data.erro) throw new Error(data.erro);
+            return data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.detail || error.message);
+        }
     },
 
     pagar: async (payload: any) => {
-        const response = await fetch(`${API_URL}/pagar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        return await response.json();
+        const { data } = await axiosInstance.post('/pagar', payload);
+        return data;
     },
 
     saveLead: async (payload: any) => {
-        const response = await fetch(`${API_URL}/salvar_lead`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        if (!response.ok) {
-            const err = await response.json();
-            console.error("Erro salvar lead:", err);
-            throw new Error(err.detail || "Erro ao salvar contato");
+        try {
+            const { data } = await axiosInstance.post('/salvar_lead', payload);
+            return data;
+        } catch (error: any) {
+            console.error("Erro salvar lead:", error);
+            throw new Error(error.response?.data?.detail || "Erro ao salvar contato");
         }
-        return await response.json();
     },
 
     getRelatorio: async (id: string) => {
-        const response = await fetch(`${API_URL}/relatorio/${id}`);
-        if (!response.ok) throw new Error("Erro ao buscar relatório");
-        return await response.json();
+        const { data } = await axiosInstance.get(`/relatorio/${id}`);
+        return data;
     },
 
     getStatusPagamento: async (id: string) => {
-        const response = await fetch(`${API_URL}/status_pagamento/${id}`);
-        return await response.json();
+        const { data } = await axiosInstance.get(`/status_pagamento/${id}`);
+        return data;
     },
 
     downloadPdf: (id: string) => {
-        window.open(`${API_URL}/download_pdf/${id}`, '_blank');
+        window.open(`${BASE_URL}/download_pdf/${id}`, '_blank');
     },
 
     triggerApproval: async (id: string) => {
-        await fetch(`${API_URL}/teste_aprovar/${id}`);
+        await axiosInstance.get(`/teste_aprovar/${id}`);
     },
-
-
 };
 
+export default axiosInstance;
+
+// Helpers de IBGE (mantidos iguais)
 export const loadStates = async () => {
     try {
         const response = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
