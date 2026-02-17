@@ -410,7 +410,7 @@ export default function App() {
   const renderResult = () => (
     <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-3xl mx-auto">
       {/* Probability Section with Blur */}
-      <div className={`bg-green-50 rounded-xl p-4 border border-green-200 mb-6 text-center transition-all duration-500 ${!isAnalysisUnlocked ? 'blur-[2px] select-none opacity-95' : ''}`}>
+      <div className={`bg-green-50 rounded-xl p-4 border border-green-200 mb-6 text-center transition-all duration-500 ${!isAnalysisUnlocked ? 'blur-[8px] select-none opacity-100 pointer-events-none grayscale-[0.2]' : ''}`}>
         <h3 className="text-[#15803d] font-bold uppercase tracking-wider text-xs mb-2">Análise Concluída com Sucesso</h3>
         <GaugeChart percentage={resultData.probabilidade} />
         <p className="text-gray-500 text-xs mt-2">Baseado em {resultData.n_casos} casos similares</p>
