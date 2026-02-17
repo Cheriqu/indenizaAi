@@ -31,8 +31,8 @@ Status do Projeto: **Fase de Escala e Otimização**
 ### 📈 Relatório de Funil & Rastreamento de Anúncios (Prioridade Alta - Anúncios Quarta-feira)
 **Objetivo:** Monitorar ROI e conversão detalhada por criativo/copy para os anúncios que iniciam dia 18/02.
 1.  **Rastreamento de Origem (UTMs):**
-    -   [ ] **Frontend:** Capturar `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` da URL e persistir. Enviar junto com o cadastro do lead.
-    -   [ ] **Backend:** Adicionar colunas de UTM na tabela `leads` e salvar a origem de cada usuário.
+    -   [x] **Frontend:** Capturar `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` da URL e persistir. Enviar junto com o cadastro do lead.
+    -   [x] **Backend:** Adicionar colunas de UTM na tabela `leads` e salvar a origem de cada usuário.
 2.  **Relatório de Funil Diário:**
     -   [x] **Integração Clarity:** Refinado rastreamento de erros e conversão com tags personalizadas e eventos de validação.
     -   [ ] **Agregação:** Criar rotina que compila: Sessões (Clarity) -> Leads (DB) -> Vendas (DB).

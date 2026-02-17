@@ -219,6 +219,11 @@ class LeadData(BaseModel):
     valor: float
     aceita_advogado: bool
     id_analise: str
+    utm_source: str | None = None
+    utm_medium: str | None = None
+    utm_campaign: str | None = None
+    utm_content: str | None = None
+    utm_term: str | None = None
 
     class Config:
         extra = "ignore"
@@ -285,9 +290,25 @@ def init_db():
                     pagou BOOLEAN DEFAULT FALSE,
                     email_recuperacao_enviado BOOLEAN DEFAULT FALSE,
                     id_analise TEXT UNIQUE,
-                    json_analise JSONB
+                    json_analise JSONB,
+                    utm_source TEXT,
+                    utm_medium TEXT,
+                    utm_campaign TEXT,
+                    utm_content TEXT,
+                    utm_term TEXT
                 );
             """)
+            
+            # Migração manual: Adiciona colunas se não existirem (para quem já tem a tabela)
+            try:
+                cur.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_source TEXT;")
+                cur.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_medium TEXT;")
+                cur.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_campaign TEXT;")
+                cur.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_content TEXT;")
+                cur.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_term TEXT;")
+            except Exception as e:
+                logger.warning(f"⚠️ Aviso ao adicionar colunas UTM: {e}")
+
         conn.commit()
     except Exception as e:
         if conn: conn.rollback()
@@ -647,13 +668,22 @@ def salvar_lead(lead: LeadData):
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM leads WHERE id_analise = %s", (lead.id_analise,))
             if cur.fetchone():
+                # Atualiza dados principais (UTMs geralmente não mudam, mas poderíamos atualizar se quiséssemos)
                 cur.execute("UPDATE leads SET nome=%s, email=%s, whatsapp=%s, cidade=%s WHERE id_analise=%s",
                           (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.id_analise))
             else:
                 cur.execute("""
-                    INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise))
+                    INSERT INTO leads (
+                        nome, email, whatsapp, cidade, resumo_caso, categoria, 
+                        probabilidade, valor_estimado, id_analise, 
+                        utm_source, utm_medium, utm_campaign, utm_content, utm_term
+                    ) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, 
+                    lead.prob, lead.valor, lead.id_analise,
+                    lead.utm_source, lead.utm_medium, lead.utm_campaign, lead.utm_content, lead.utm_term
+                ))
         conn.commit()
     except Exception as e:
         if conn: conn.rollback()
@@ -930,6 +960,64 @@ class LogActivity(BaseModel):
 
 # --- HELPERS DASHBOARD ---
 
+@app.get("/api/dashboard/stats")
+def get_dashboard_stats():
+    """
+    Retorna estatísticas gerais para o dashboard (Mission Control).
+    Não requer senha, mas não retorna dados sensíveis completos.
+    """
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500)
+    
+    try:
+        with conn.cursor() as cur:
+            # 1. Total Leads
+            cur.execute("SELECT COUNT(*) FROM leads")
+            total_leads = cur.fetchone()[0]
+            
+            # 2. Total Vendas (Pagos)
+            cur.execute("SELECT COUNT(*) FROM leads WHERE pagou = TRUE")
+            total_vendas = cur.fetchone()[0]
+            
+            # 3. Valor Total Recuperável (Estimado)
+            cur.execute("SELECT SUM(valor_estimado) FROM leads")
+            val_recup = cur.fetchone()[0] or 0
+            
+            # 4. Leads Hoje
+            cur.execute("SELECT COUNT(*) FROM leads WHERE data_registro >= CURRENT_DATE")
+            leads_hoje = cur.fetchone()[0]
+            
+            # 5. Últimos 5 Leads (Resumido) com UTM
+            cur.execute("""
+                SELECT nome, data_registro, pagou, categoria, utm_source, utm_campaign 
+                FROM leads 
+                ORDER BY id DESC 
+                LIMIT 5
+            """)
+            recents = []
+            for r in cur.fetchall():
+                recents.append({
+                    "nome": r[0].split()[0] + "...", # Anonimizado
+                    "data": r[1].isoformat(),
+                    "pagou": r[2],
+                    "categoria": r[3],
+                    "source": r[4] or "Direto",
+                    "campaign": r[5] or "-"
+                })
+                
+        return {
+            "total_leads": total_leads,
+            "total_vendas": total_vendas,
+            "leads_hoje": leads_hoje,
+            "valor_recuperavel": val_recup,
+            "recent_leads": recents
+        }
+    except Exception as e:
+        logger.error(f"Erro dashboard stats: {e}")
+        return {"error": str(e)}
+    finally:
+        release_db_connection(conn)
+
 def registrar_atividade(action: str, details: dict, status: str = "SUCCESS"):
     """
     Registra uma ação na tabela activity_logs.
@@ -979,8 +1067,63 @@ def get_activity_logs(limit: int = 50, offset: int = 0):
     finally:
         release_db_connection(conn)
 
-@app.get("/api/dashboard/calendar")
-def get_scheduled_tasks():
+@app.get("/api/dashboard/stats")
+def get_dashboard_stats():
+    """
+    Retorna estatísticas gerais para o dashboard (Mission Control).
+    Não requer senha, mas não retorna dados sensíveis completos.
+    """
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500)
+    
+    try:
+        with conn.cursor() as cur:
+            # 1. Total Leads
+            cur.execute("SELECT COUNT(*) FROM leads")
+            total_leads = cur.fetchone()[0]
+            
+            # 2. Total Vendas (Pagos)
+            cur.execute("SELECT COUNT(*) FROM leads WHERE pagou = TRUE")
+            total_vendas = cur.fetchone()[0]
+            
+            # 3. Valor Total Recuperável (Estimado)
+            cur.execute("SELECT SUM(valor_estimado) FROM leads")
+            val_recup = cur.fetchone()[0] or 0
+            
+            # 4. Leads Hoje
+            cur.execute("SELECT COUNT(*) FROM leads WHERE data_registro >= CURRENT_DATE")
+            leads_hoje = cur.fetchone()[0]
+            
+            # 5. Últimos 5 Leads (Resumido) com UTM
+            cur.execute("""
+                SELECT nome, data_registro, pagou, categoria, utm_source, utm_campaign 
+                FROM leads 
+                ORDER BY id DESC 
+                LIMIT 5
+            """)
+            recents = []
+            for r in cur.fetchall():
+                recents.append({
+                    "nome": r[0].split()[0] + "...", # Anonimizado
+                    "data": r[1].isoformat(),
+                    "pagou": r[2],
+                    "categoria": r[3],
+                    "source": r[4] or "Direto",
+                    "campaign": r[5] or "-"
+                })
+                
+        return {
+            "total_leads": total_leads,
+            "total_vendas": total_vendas,
+            "leads_hoje": leads_hoje,
+            "valor_recuperavel": val_recup,
+            "recent_leads": recents
+        }
+    except Exception as e:
+        logger.error(f"Erro dashboard stats: {e}")
+        return {"error": str(e)}
+    finally:
+        release_db_connection(conn)
     """Retorna tarefas agendadas (simuladas do banco)."""
     conn = get_db_connection()
     if not conn: raise HTTPException(status_code=500, detail="Database error")

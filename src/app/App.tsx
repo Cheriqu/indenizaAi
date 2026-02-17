@@ -71,6 +71,9 @@ export default function App() {
   const [aguardandoPagamento, setAguardandoPagamento] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // STATE: UTM Tracking
+  const [utms, setUtms] = useState({ source: '', medium: '', campaign: '', content: '', term: '' });
+
   // STATE: History
   const [historico, setHistorico] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -80,6 +83,29 @@ export default function App() {
   useEffect(() => {
     // Initial Load - States
     loadStates().then(setListaEstados);
+
+    // CAPTURE UTMs
+    const params = new URLSearchParams(window.location.search);
+    const capturedUtms = {
+      source: params.get('utm_source') || '',
+      medium: params.get('utm_medium') || '',
+      campaign: params.get('utm_campaign') || '',
+      content: params.get('utm_content') || '',
+      term: params.get('utm_term') || ''
+    };
+    if (Object.values(capturedUtms).some(val => val)) {
+      setUtms(capturedUtms);
+      // Persist in Session Storage for reload resilience
+      sessionStorage.setItem('indeniza_utms', JSON.stringify(capturedUtms));
+      
+      // Track source in Clarity
+      if (capturedUtms.source) tagSession("utm_source", capturedUtms.source);
+      if (capturedUtms.campaign) tagSession("utm_campaign", capturedUtms.campaign);
+    } else {
+      // Try to recover from session storage
+      const saved = sessionStorage.getItem('indeniza_utms');
+      if (saved) setUtms(JSON.parse(saved));
+    }
 
     // Check for Recovery Link
     const urlParams = new URLSearchParams(window.location.search);
@@ -225,7 +251,8 @@ export default function App() {
     try {
       const payload = {
         ...formData, resumo: inputValue, categoria: resultData.categoria,
-        prob: resultData.probabilidade, valor: resultData.valor_estimado, aceita_advogado: formData.aceitaAdvogado, id_analise: analiseId
+        prob: resultData.probabilidade, valor: resultData.valor_estimado, aceita_advogado: formData.aceitaAdvogado, id_analise: analiseId,
+        utm_source: utms.source, utm_medium: utms.medium, utm_campaign: utms.campaign, utm_content: utms.content, utm_term: utms.term
       };
       const data = await api.pagar(payload);
       if (data.link) {
@@ -388,7 +415,12 @@ export default function App() {
         prob: resultData.probabilidade,
         valor: resultData.valor_estimado,
         aceita_advogado: formData.aceitaAdvogado,
-        id_analise: analiseId
+        id_analise: analiseId,
+        utm_source: utms.source,
+        utm_medium: utms.medium,
+        utm_campaign: utms.campaign,
+        utm_content: utms.content,
+        utm_term: utms.term
       };
       await api.saveLead(payload);
       setIsAnalysisUnlocked(true);
