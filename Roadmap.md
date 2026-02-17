@@ -34,7 +34,7 @@ Status do Projeto: **Fase de Escala e Otimização**
     -   [ ] **Frontend:** Capturar `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` da URL e persistir. Enviar junto com o cadastro do lead.
     -   [ ] **Backend:** Adicionar colunas de UTM na tabela `leads` e salvar a origem de cada usuário.
 2.  **Relatório de Funil Diário:**
-    -   [ ] **Integração Clarity:** Obter número de sessões diárias via API do Microsoft Clarity (ou Data Export).
+    -   [x] **Integração Clarity:** Refinado rastreamento de erros e conversão com tags personalizadas e eventos de validação.
     -   [ ] **Agregação:** Criar rotina que compila: Sessões (Clarity) -> Leads (DB) -> Vendas (DB).
     -   [ ] **Conversão por Anúncio:** Detalhar Leads e Vendas agrupados por `utm_content` (identificador do anúncio/criativo) e `utm_campaign`.
     -   [ ] **Envio Automático:** Enviar este resumo diariamente (E-mail/Telegram) para o Luiz.
