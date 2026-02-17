@@ -28,6 +28,9 @@ from urllib.parse import quote
 import re
 import requests
 import base64
+import sentry_sdk
+from datetime import datetime, timedelta
+from collections import defaultdict
 
 # --- REPORTLAB (GERADOR DE PDF) ---
 from reportlab.lib.pagesizes import A4
@@ -51,7 +54,47 @@ logger = logging.getLogger(__name__)
 # Carrega variáveis de ambiente
 load_dotenv()
 
+# --- SENTRY SETUP ---
+SENTRY_DSN = os.getenv("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        traces_sample_rate=0.2, # Amostragem de 20% das transações
+        profiles_sample_rate=0.2,
+    )
+    logger.info("✅ Sentry inicializado.")
+else:
+    logger.info("⚠️ Sentry NÃO configurado (DSN ausente).")
+
 app = FastAPI()
+
+# --- RATE LIMITING (In-Memory) ---
+# Estrutura: { "IP": [timestamp1, timestamp2, ...] }
+RATE_LIMIT_STORE = defaultdict(list)
+MAX_REQUESTS_PER_DAY = 100
+WINDOW_SECONDS = 86400 # 24 horas
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    # Apenas aplica rate limit na rota de análise (heavy load)
+    if request.url.path == "/api/analisar" and request.method == "POST":
+        client_ip = request.client.host
+        now = datetime.now().timestamp()
+        
+        # Limpa requisições antigas (janela móvel)
+        RATE_LIMIT_STORE[client_ip] = [t for t in RATE_LIMIT_STORE[client_ip] if now - t < WINDOW_SECONDS]
+        
+        # Verifica limite
+        if len(RATE_LIMIT_STORE[client_ip]) >= MAX_REQUESTS_PER_DAY:
+            logger.warning(f"🚫 Rate Limit excedido para IP: {client_ip}")
+            # Retorna 429 mas finge ser erro genérico para não expor a regra (segurança por obscuridade solicitada)
+            return StreamingResponse(iter(["Erro: Muitas tentativas. Tente novamente amanhã."]), status_code=429)
+        
+        # Registra nova requisição
+        RATE_LIMIT_STORE[client_ip].append(now)
+
+    response = await call_next(request)
+    return response
 
 # Configuração de CORS
 app.add_middleware(
@@ -172,6 +215,12 @@ class LeadData(BaseModel):
     valor: float
     aceita_advogado: bool
     id_analise: str
+    # UTM Tracking
+    utm_source: str = None
+    utm_medium: str = None
+    utm_campaign: str = None
+    utm_term: str = None
+    utm_content: str = None
 
     class Config:
         extra = "ignore"
@@ -223,6 +272,13 @@ def init_db():
     try:
         c.execute("ALTER TABLE leads ADD COLUMN json_analise TEXT")
     except: pass
+    
+    # Colunas de UTM Tracking
+    colunas_utm = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"]
+    for col in colunas_utm:
+        try: c.execute(f"ALTER TABLE leads ADD COLUMN {col} TEXT")
+        except: pass
+        
     conn.commit()
     conn.close()
 
@@ -539,11 +595,18 @@ def salvar_lead(lead: LeadData):
     c = conn.cursor()
     c.execute("SELECT id FROM leads WHERE id_analise = ?", (lead.id_analise,))
     if c.fetchone():
-        c.execute("UPDATE leads SET nome=?, email=?, whatsapp=?, cidade=? WHERE id_analise=?",
-                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.id_analise))
+        c.execute("""UPDATE leads SET nome=?, email=?, whatsapp=?, cidade=?, 
+                     utm_source=?, utm_medium=?, utm_campaign=?, utm_term=?, utm_content=? 
+                     WHERE id_analise=?""",
+                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, 
+                   lead.utm_source, lead.utm_medium, lead.utm_campaign, lead.utm_term, lead.utm_content, 
+                   lead.id_analise))
     else:
-        c.execute("INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise) VALUES (?,?,?,?,?,?,?,?,?)",
-                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise))
+        c.execute("""INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise, 
+                     utm_source, utm_medium, utm_campaign, utm_term, utm_content) 
+                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                  (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise, 
+                   lead.utm_source, lead.utm_medium, lead.utm_campaign, lead.utm_term, lead.utm_content))
     conn.commit()
     conn.close()
     return {"status": "saved"}

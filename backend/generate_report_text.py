@@ -77,6 +77,18 @@ def generate_daily_report():
             # 5. Taxa de Conversão
             conversao = (vendas_qtd / analises_total * 100) if analises_total > 0 else 0
 
+            # 6. Breakdown por Campanha (UTM)
+            cur.execute("""
+                SELECT COALESCE(utm_campaign, 'Direto/Orgânico') as campanha, 
+                       COUNT(*) as analises, 
+                       SUM(CASE WHEN pagou THEN 1 ELSE 0 END) as vendas
+                FROM leads 
+                WHERE data_registro::date = %s 
+                GROUP BY 1
+                ORDER BY analises DESC
+            """, (target_date,))
+            campanhas = cur.fetchall()
+
         # Formatação do Texto
         texto = f"📊 *Relatório Diário - IndenizaAí* ({formatted_date})\n\n"
         
@@ -84,6 +96,13 @@ def generate_daily_report():
         texto += f"📝 *Análises Realizadas:* {analises_total}\n"
         texto += f"💰 *Vendas:* {vendas_qtd} (R$ {vendas_valor:.2f})\n"
         texto += f"📈 *Conversão:* {conversao:.1f}%\n\n"
+
+        if campanhas:
+            texto += "*Desempenho por Campanha:*\n"
+            for camp, an, ven in campanhas:
+                conv_camp = (ven / an * 100) if an > 0 else 0
+                texto += f"- *{camp}:* {an} leads | {ven} vendas ({conv_camp:.1f}%)\n"
+            texto += "\n"
 
         if categorias:
             texto += "*Top Categorias:*\n"

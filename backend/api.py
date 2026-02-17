@@ -221,6 +221,8 @@ class LeadData(BaseModel):
     valor: float
     aceita_advogado: bool
     id_analise: str
+    utm_source: str | None = None
+    utm_campaign: str | None = None
 
     class Config:
         extra = "ignore"
@@ -676,7 +678,7 @@ def analisar_caso(request: AnaliseRequest):
 
 @app.post("/api/salvar_lead")
 def salvar_lead(lead: LeadData):
-    logger.info(f"💾 Salvando contato: {lead.nome} ({lead.email}) - ID: {lead.id_analise}")
+    logger.info(f"💾 Salvando contato: {lead.nome} ({lead.email}) - ID: {lead.id_analise} - Campaign: {lead.utm_campaign}")
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Database unavailable")
@@ -685,13 +687,13 @@ def salvar_lead(lead: LeadData):
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM leads WHERE id_analise = %s", (lead.id_analise,))
             if cur.fetchone():
-                cur.execute("UPDATE leads SET nome=%s, email=%s, whatsapp=%s, cidade=%s WHERE id_analise=%s",
-                          (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.id_analise))
+                cur.execute("UPDATE leads SET nome=%s, email=%s, whatsapp=%s, cidade=%s, utm_source=%s, utm_campaign=%s WHERE id_analise=%s",
+                          (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.utm_source, lead.utm_campaign, lead.id_analise))
             else:
                 cur.execute("""
-                    INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise))
+                    INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise, utm_source, utm_campaign) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise, lead.utm_source, lead.utm_campaign))
         conn.commit()
     except Exception as e:
         if conn: conn.rollback()

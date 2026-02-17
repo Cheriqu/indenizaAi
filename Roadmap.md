@@ -12,8 +12,8 @@ O foco total esta semana é **Estabilidade e Observabilidade** para suportar o a
 ### 📊 Observabilidade & Dados (Prioridade Alta)
 - [x] **Relatório Diário Automático:** Implementado envio de resumo via Telegram (Leads, Vendas, Acessos).
 - [x] **Painel Mission Control:** Atualização visual e integração de métricas em tempo real.
-- [ ] **Rastreamento UTM:** Capturar origem do tráfego (Facebook/Google) para medir ROI por anúncio.
-- [ ] **Integração Clarity:** Refinar coleta de dados de comportamento do usuário.
+- [x] **Rastreamento UTM:** Capturar origem do tráfego (Facebook/Google) para medir ROI por anúncio.
+- [x] **Integração Clarity:** Refinar coleta de dados de comportamento do usuário.
 
 ### 🛡️ Infraestrutura & Segurança
 - [x] **Cron Jobs (OpenClaw):** Migração de tarefas agendadas para o gerenciador interno.

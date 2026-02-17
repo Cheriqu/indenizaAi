@@ -72,10 +72,33 @@ export default function App() {
   // STATE: History
   const [historico, setHistorico] = useState<string[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  
+  // STATE: UTM Tracking
+  const [utmParams, setUtmParams] = useState({ 
+    source: '', 
+    medium: '', 
+    campaign: '', 
+    term: '', 
+    content: '' 
+  });
 
   // --- USE EFFECTS ---
 
   useEffect(() => {
+    // Capture UTMs
+    const params = new URLSearchParams(window.location.search);
+    const utms = {
+      source: params.get('utm_source') || '',
+      medium: params.get('utm_medium') || '',
+      campaign: params.get('utm_campaign') || '',
+      term: params.get('utm_term') || '',
+      content: params.get('utm_content') || ''
+    };
+    
+    if (Object.values(utms).some(val => val !== '')) {
+      setUtmParams(utms);
+    }
+
     // Initial Load - States
     loadStates().then(setListaEstados);
 
@@ -221,8 +244,15 @@ export default function App() {
       setResultData(data);
       setAnaliseId(data.id_analise);
       setStep('RESULT');
+      // Clarity Event: View Result
+      // @ts-ignore
+      if (window.clarity) window.clarity('event', 'view_result');
     } catch (error: any) {
-      alert(error.message || "Erro desconhecido.");
+      if (error.response?.status === 429) {
+        alert("Ops! Parece que você fez muitas consultas hoje. Tente novamente amanhã.");
+      } else {
+        alert(error.message || "Erro desconhecido. Tente novamente.");
+      }
       setStep('INPUT');
     }
   };
@@ -230,6 +260,10 @@ export default function App() {
   const handlePayment = async () => {
     if (!formData.nome || !formData.email) return alert("Preencha seus dados para continuar.");
     if (!formData.aceitaAdvogado) return alert("Por favor, aceite o termo de contato para continuar.");
+
+    // Clarity Event: Payment Click
+    // @ts-ignore
+    if (window.clarity) window.clarity('event', 'payment_click');
 
     setAguardandoPagamento(true);
     try {
@@ -311,12 +345,13 @@ export default function App() {
       <div className="mb-5">
         <label className="block text-sm md:text-base font-semibold text-[#0f172a] mb-2 flex justify-between items-center">
           Conte o que aconteceu com você:
-          <span className={`text-xs ${inputValue.length > 50 ? 'text-green-500' : 'text-gray-400'}`}>{inputValue.length} caracteres</span>
+          <span className={`text-xs ${inputValue.length > 50 ? 'text-green-500' : 'text-gray-400'}`}>{inputValue.length}/5000 caracteres</span>
         </label>
         <textarea
           className="form-input w-full min-h-[120px] bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-sm md:text-base text-[#0f172a] resize-none transition-all duration-300 focus:outline-none focus:border-[#1c80b2] focus:ring-2 focus:ring-[#1c80b2]/20 shadow-inner"
           placeholder="Ex: Meu voo foi cancelado sem aviso prévio, descobri um empréstimo no meu nome que não fiz, fui cobrado por taxas bancárias abusivas..."
           value={inputValue}
+          maxLength={5000}
           onChange={(e) => setInputValue(e.target.value)}
         />
       </div>
@@ -393,8 +428,17 @@ export default function App() {
         prob: resultData.probabilidade,
         valor: resultData.valor_estimado,
         aceita_advogado: formData.aceitaAdvogado,
-        id_analise: analiseId
+        id_analise: analiseId,
+        utm_source: utmParams.source,
+        utm_medium: utmParams.medium,
+        utm_campaign: utmParams.campaign,
+        utm_term: utmParams.term,
+        utm_content: utmParams.content
       };
+      
+      // Clarity Event: Unlock Attempt
+      // @ts-ignore
+      if (window.clarity) window.clarity('event', 'unlock_click');
       await api.saveLead(payload);
       setIsAnalysisUnlocked(true);
     } catch (error) {
