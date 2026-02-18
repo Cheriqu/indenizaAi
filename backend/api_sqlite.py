@@ -29,6 +29,7 @@ import re
 import requests
 import base64
 import sentry_sdk
+import psutil
 from datetime import datetime, timedelta
 from collections import defaultdict
 
@@ -278,6 +279,15 @@ def init_db():
     for col in colunas_utm:
         try: c.execute(f"ALTER TABLE leads ADD COLUMN {col} TEXT")
         except: pass
+        
+    # Tabela de Métricas do Sistema
+    c.execute('''CREATE TABLE IF NOT EXISTS system_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+        cpu_percent REAL,
+        memory_percent REAL,
+        disk_percent REAL
+    )''')
         
     conn.commit()
     conn.close()
@@ -891,6 +901,62 @@ def admin_aprovar_manual(req: AdminActionRequest, background_tasks: BackgroundTa
     background_tasks.add_task(processar_aprovacao_manual_background, id_analise)
 
     return {"status": "ok", "mensagem": "Pagamento aprovado. E-mail será enviado em instantes."}
+
+@app.get("/api/admin/metrics")
+def get_metrics():
+    # 1. Coleta Métricas Atuais Completas
+    cpu = psutil.cpu_percent()
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
+    # 2. Salva no Banco (Simplificado)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO system_metrics (cpu_percent, memory_percent, disk_percent) VALUES (?, ?, ?)", 
+              (cpu, mem.percent, disk.percent))
+    conn.commit()
+    
+    # 3. Limpeza Automática
+    try:
+        c.execute("DELETE FROM system_metrics WHERE timestamp < datetime('now', '-7 days')")
+        conn.commit()
+    except: pass
+
+    # 4. Retorna Histórico (Últimas 48h)
+    c.execute("""
+        SELECT strftime('%H:%M', timestamp), cpu_percent, memory_percent, disk_percent 
+        FROM system_metrics 
+        WHERE timestamp >= datetime('now', '-48 hours')
+        ORDER BY timestamp ASC
+    """)
+    rows = c.fetchall()
+    conn.close()
+    
+    history = []
+    for r in rows:
+        history.append({
+            "time": r[0],
+            "cpu": r[1],
+            "memory": r[2],
+            "disk": r[3]
+        })
+        
+    return {
+        "system": {
+            "cpu": cpu,
+            "memory_percent": mem.percent,
+            "memory_used_gb": round(mem.used / (1024**3), 2),
+            "memory_total_gb": round(mem.total / (1024**3), 2),
+            "disk_percent": disk.percent,
+            "disk_free_gb": round(disk.free / (1024**3), 2)
+        },
+        "application": {
+            "cache_items": len(ANALISES_CACHE),
+            "cache_max": ANALISES_CACHE.maxsize,
+            "db_pool": "Active"
+        },
+        "history": history
+    }
 
 @app.get("/")
 def root(): return {"status": "Online", "db": "ChromaDB"}

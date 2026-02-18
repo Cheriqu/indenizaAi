@@ -3,6 +3,7 @@ import logging
 import psycopg2
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from cron_utils import sync_cron_tasks
 
 # Configuração de Log
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -120,4 +121,5 @@ def generate_daily_report():
         if conn: conn.close()
 
 if __name__ == "__main__":
+    sync_cron_tasks()
     print(generate_daily_report())

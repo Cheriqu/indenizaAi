@@ -25,8 +25,6 @@ PG_USER = os.getenv("PG_USER")
 PG_PASSWORD = os.getenv("PG_PASSWORD")
 PG_DB = os.getenv("PG_DB")
 
-OPENCLAW_CRON_FILE = "/root/.openclaw/cron/jobs.json"
-
 def get_db_connection():
     try:
         conn = psycopg2.connect(
@@ -128,8 +126,13 @@ def get_clarity_metrics():
         logger.error(f"❌ Erro ao conectar com API Clarity: {str(e)}")
         return 0
 
+from cron_utils import sync_cron_tasks
+
 def collect_daily_metrics():
     logger.info("🚀 Iniciando Coleta Diária de Analytics...")
+    
+    # 0. Sync Cron Tasks (Atualiza Painel)
+    sync_cron_tasks()
     
     conn = get_db_connection()
     if not conn:
@@ -137,9 +140,6 @@ def collect_daily_metrics():
         return
 
     try:
-        # 0. Sync Cron Tasks (Novo!)
-        sync_cron_tasks(conn)
-
         # 1. Coleta Leads do Dia (Real)
         with conn.cursor() as cur:
             cur.execute("""

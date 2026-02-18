@@ -12,7 +12,7 @@ O **IndenizaAi** é uma LegalTech que utiliza Inteligência Artificial para anal
 *   **Banco de Dados:** PostgreSQL (Dados relacionais)
 *   **Vector DB:** ChromaDB (Busca semântica de jurisprudência)
 *   **AI:** Google Gemini (Análise de contexto e classificação)
-*   **Tasks:** BackgroundTasks (Async) + Cron Jobs (Recuperação)
+*   **Tasks:** BackgroundTasks (Async) + Cron Jobs (Recuperação) + System Metrics
 *   **Libs Principais:** `psycopg2`, `sentence-transformers`, `uvicorn`, `mercadopago`.
 
 ### Frontend (`/src`)
@@ -79,9 +79,10 @@ Um script (`backend/recovery.py`) roda via **Cron** a cada 1 hora.
 *   Envia e-mail único com link de recuperação (`?recover=UUID`).
 *   O frontend restaura a sessão e permite pagamento direto.
 
-### 🛡️ Admin
+### 📊 Mission Control
 Painel administrativo para:
 *   Visualizar KPIs (Conversão, Faturamento).
+*   Visualizar métricas do sistema (CPU, Memória, Disco).
 *   Exportar CSV de leads.
 *   Reenviar e-mails de clientes manualmente.
 *   Aprovar pagamentos manualmente.
@@ -94,7 +95,7 @@ Painel administrativo para:
     *   `recovery.py`: Script de automação.
     *   `chroma_db/`: Banco vetorial (persistente).
 *   `src/`: Código React.
-    *   `app/App.tsx`: Lógica principal do frontend.
+    *   `app/components/MissionControl.tsx`: Dashboard com Histórico do Sistema.
 *   `dist/`: Build de produção do frontend.
 
 ---

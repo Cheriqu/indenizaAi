@@ -169,7 +169,7 @@ const MissionControl: React.FC = () => {
     };
 
     return (
-        <div className="container mx-auto p-6 space-y-6 animate-in fade-in duration-500 pb-20 bg-[#f8fafc] min-h-screen">
+        <div className="w-full px-6 py-6 space-y-6 animate-in fade-in duration-500 pb-20 bg-[#f8fafc] min-h-screen">
             <header className="flex justify-between items-center mb-6 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <div className="flex items-center gap-3">
                     <span className="text-4xl">🚀</span>
@@ -261,6 +261,7 @@ const MissionControl: React.FC = () => {
                                     <Legend />
                                     <Line type="monotone" dataKey="cpu" stroke="#ef4444" name="CPU %" strokeWidth={2} dot={false} activeDot={{r: 4}} />
                                     <Line type="monotone" dataKey="memory" stroke="#3b82f6" name="Memória %" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="disk" stroke="#10b981" name="Disco %" strokeWidth={2} dot={false} />
                                 </LineChart>
                             </ResponsiveContainer>
                         ) : (

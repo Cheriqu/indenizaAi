@@ -18,8 +18,8 @@ O foco total esta semana é **Estabilidade e Observabilidade** para suportar o a
 ### 🛡️ Infraestrutura & Segurança
 - [x] **Cron Jobs (OpenClaw):** Migração de tarefas agendadas para o gerenciador interno.
 - [x] **Manutenção de Memória:** Script automático para limpeza de logs antigos.
-- [ ] **Rate Limiting:** Proteção contra abuso de API (Nginx/FastAPI).
-- [ ] **Monitoramento de Erros:** Configurar Sentry para alertas em tempo real.
+- [x] **Rate Limiting:** Proteção contra abuso de API (FastAPI Middleware, 100/dia/IP).
+- [x] **Monitoramento de Erros:** Configurado Sentry para alertas em tempo real.
 
 ---
 

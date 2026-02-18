@@ -5,6 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from cron_utils import sync_cron_tasks
 
 # Configuração de Log
 logging.basicConfig(
@@ -87,4 +88,5 @@ def prune_memory():
             logger.error(f"Erro ao processar {file_path.name}: {e}")
 
 if __name__ == "__main__":
+    sync_cron_tasks()
     prune_memory()

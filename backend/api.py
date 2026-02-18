@@ -215,6 +215,8 @@ class LeadData(BaseModel):
     email: str
     whatsapp: str
     cidade: str
+    cep: str | None = None
+    estado: str | None = None
     resumo: str
     categoria: str
     prob: float
@@ -683,17 +685,24 @@ def salvar_lead(lead: LeadData):
     if not conn:
         raise HTTPException(status_code=500, detail="Database unavailable")
     
+    # Tratamento para concatenar CEP/Estado se existirem
+    cidade_completa = lead.cidade
+    if lead.estado:
+        cidade_completa += f" - {lead.estado}"
+    if lead.cep:
+        cidade_completa += f" (CEP: {lead.cep})"
+    
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM leads WHERE id_analise = %s", (lead.id_analise,))
             if cur.fetchone():
                 cur.execute("UPDATE leads SET nome=%s, email=%s, whatsapp=%s, cidade=%s, utm_source=%s, utm_campaign=%s WHERE id_analise=%s",
-                          (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.utm_source, lead.utm_campaign, lead.id_analise))
+                          (lead.nome, lead.email, lead.whatsapp, cidade_completa, lead.utm_source, lead.utm_campaign, lead.id_analise))
             else:
                 cur.execute("""
                     INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise, utm_source, utm_campaign) 
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise, lead.utm_source, lead.utm_campaign))
+                """, (lead.nome, lead.email, lead.whatsapp, cidade_completa, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise, lead.utm_source, lead.utm_campaign))
         conn.commit()
     except Exception as e:
         if conn: conn.rollback()
@@ -1095,12 +1104,18 @@ def get_system_metrics():
                         conn.commit()
                     
                     # Recupera histórico para o gráfico (últimas 24h ~ 48 pontos)
-                    cur.execute("SELECT created_at, cpu_percent, memory_percent, disk_percent, cache_items FROM system_metrics ORDER BY created_at ASC LIMIT 50")
+                    # CORRIGIDO: Deve ordenar DESC para pegar os últimos, e depois inverter no Python
+                    cur.execute("SELECT created_at, cpu_percent, memory_percent, disk_percent, cache_items FROM system_metrics ORDER BY created_at DESC LIMIT 50")
                     rows = cur.fetchall()
+                    # Inverte para ordem cronológica (gráfico esquerda->direita)
+                    rows.reverse()
+                    
                     for r in rows:
+                        # Ajuste Fuso Horário (UTC -> GMT-3)
+                        time_br = r[0] - timedelta(hours=3)
                         history.append({
-                            "time": r[0].strftime("%H:%M"),
-                            "cpu": r[1],
+                            "time": time_br.strftime("%H:%M"),
+                            "cpu": round(float(r[1]), 1),
                             "memory": r[2],
                             "disk": r[3],
                             "cache": r[4]
@@ -1112,7 +1127,7 @@ def get_system_metrics():
 
         return {
             "system": {
-                "cpu": cpu_usage,
+                "cpu": round(cpu_usage, 1),
                 "memory_percent": memory.percent,
                 "memory_used_gb": round(memory.used / (1024**3), 2),
                 "memory_total_gb": round(memory.total / (1024**3), 2),
