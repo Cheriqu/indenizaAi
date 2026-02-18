@@ -1,7 +1,5 @@
 # ⚖️ Indeniza.ai - LegalTech com Inteligência Artificial
 
-> **Nota:** Este projeto foi desenvolvido como um case de portfólio para demonstrar competências em Engenharia de Software, Arquitetura de Sistemas e Engenharia de IA.
-
 ---
 
 ## 🚀 Sobre o Projeto
@@ -53,7 +51,3 @@ O projeto foi construído utilizando uma arquitetura moderna, escalável e segur
 ## 📱 Status do Projeto
 
 O projeto encontra-se em produção, processando leads reais e servindo como base para automação de triagem jurídica.
-
----
-
-Desenvolvido por **Luiz Cherique**.
