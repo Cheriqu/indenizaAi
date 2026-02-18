@@ -30,4 +30,24 @@ backend/chroma_db/
 # --- IDEs & OS ---
 .vscode/
 .idea/
-.DS_Store
+
+# --- OpenClaw Assistant Files (BLOCK) ---
+AGENTS.md
+MEMORY.md
+TOOLS.md
+SKILL.md
+USER.md
+SOUL.md
+BOOTSTRAP.md
+HEARTBEAT.md
+.openclaw/
+workspace/
+skills/
+memory/
+
+# --- Temporary Files ---
+*.bak
+*.old
+*.tmp
+temp_*.py
+fix_*.py
