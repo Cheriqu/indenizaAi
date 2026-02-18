@@ -57,7 +57,7 @@ export default function App() {
 
   // STATE: Input Data
   const [inputValue, setInputValue] = useState("");
-  const [formData, setFormData] = useState({ nome: '', email: '', whatsapp: '', cidade: '', estado: '', aceitaAdvogado: false });
+  const [formData, setFormData] = useState<{ nome: string, email: string, whatsapp: string, cidade: string, estado: string, cep?: string, aceitaAdvogado: boolean }>({ nome: '', email: '', whatsapp: '', cidade: '', estado: '', cep: '', aceitaAdvogado: false });
   const [listaEstados, setListaEstados] = useState<{ sigla: string, nome: string }[]>([]);
   const [listaCidades, setListaCidades] = useState<string[]>([]);
   const [selectedEstado, setSelectedEstado] = useState("");
@@ -172,28 +172,53 @@ export default function App() {
     }
   }, [analiseId]);
 
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  // ... (dentro de useEffect)
+  
   // Loading Text Animation
   useEffect(() => {
     if (step === 'LOADING') {
       const msgs = [
-        "Conectando ao Tribunal de Justiça...",
-        "Consultando Jurisprudência (TJPR)...",
-        "Comparando com casos similares...",
-        "Calculando probabilidade de êxito...",
-        "Gerando relatório preliminar..."
+        "Analisando seu relato com Inteligência Artificial...",
+        "Consultando jurisprudência no TJPR...",
+        "Comparando com 5.000+ casos similares...",
+        "Calculando probabilidade de êxito..."
       ];
-      let i = 0;
-      if (!loadingText.includes("Recuperando")) setLoadingText(msgs[0]);
+      
+      let currentEtapa = 0;
+      setLoadingProgress(0);
+      setLoadingText(msgs[0]);
 
-      const interval = setInterval(() => {
-        if (!loadingText.includes("Recuperando")) {
-          i = (i + 1) % msgs.length;
-          setLoadingText(msgs[i]);
+      // Gerencia as mensagens (1s cada, sem loop, para no último)
+      const textInterval = setInterval(() => {
+        currentEtapa++;
+        if (currentEtapa < msgs.length) {
+          setLoadingText(msgs[currentEtapa]);
+        } else {
+          clearInterval(textInterval); // Para no último
         }
-      }, 2500);
-      return () => clearInterval(interval);
+      }, 1000);
+
+      // Gerencia a barra de progresso (Logarítmica/Assimptótica)
+      // Começa rápido, depois desacelera para nunca chegar a 100% antes da resposta
+      const progressInterval = setInterval(() => {
+        setLoadingProgress(prev => {
+          if (prev >= 95) return 95; // Trava em 95%
+          
+          // Se estiver no início, avança mais rápido
+          const speed = prev < 30 ? 2.5 : prev < 70 ? 1.0 : 0.4;
+          return prev + speed;
+        });
+      }, 100);
+
+      return () => {
+        clearInterval(textInterval);
+        clearInterval(progressInterval);
+      };
     }
   }, [step]);
+
 
   // Payment Polling
   useEffect(() => {
@@ -216,10 +241,14 @@ export default function App() {
   // --- ACTIONS ---
 
   const handleAnalyze = async () => {
+<<<<<<< HEAD
     if (inputValue.length < 10) {
       trackEvent("error_input_too_short");
       return alert("Por favor, descreva melhor o caso.");
     }
+=======
+    if (inputValue.length < 30) return alert("Por favor, descreva melhor o caso com pelo menos 30 caracteres.");
+>>>>>>> e920a5f1ef9942d4a29d5d1191319f43e2cce6ea
     setStep('LOADING');
     setIsAnalysisUnlocked(false); // RESET: Força o bloqueio para a nova análise exigir salvamento
     try {
@@ -330,6 +359,7 @@ export default function App() {
   const renderInputForm = () => (
     <div className="form-card bg-white rounded-3xl p-6 md:p-8 shadow-xl relative animate-in fade-in zoom-in duration-300">
       <div className="mb-5">
+<<<<<<< HEAD
         <div className="flex justify-between items-center mb-2">
           <label className="block text-sm md:text-base font-semibold text-[#0f172a]">
             Conte o que aconteceu com você:
@@ -339,6 +369,12 @@ export default function App() {
             <span className={`text-xs ${inputValue.length > 50 ? 'text-green-500' : 'text-gray-400'}`}>{inputValue.length} chars</span>
           </div>
         </div>
+=======
+        <label className="block text-sm md:text-base font-semibold text-[#0f172a] mb-2 flex justify-between items-center">
+          Conte o que aconteceu com você:
+          <span className={`text-xs ${inputValue.length > 50 ? 'text-green-500' : 'text-gray-400'}`}>{inputValue.length} caracteres</span>
+        </label>
+>>>>>>> e920a5f1ef9942d4a29d5d1191319f43e2cce6ea
         <textarea
           className="form-input w-full min-h-[120px] bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-sm md:text-base text-[#0f172a] resize-none transition-all duration-300 focus:outline-none focus:border-[#1c80b2] focus:ring-2 focus:ring-[#1c80b2]/20 shadow-inner"
           placeholder="Ex: Meu voo foi cancelado sem aviso prévio, descobri um empréstimo no meu nome que não fiz, fui cobrado por taxas bancárias abusivas..."
@@ -349,7 +385,7 @@ export default function App() {
 
       <div className="flex items-center gap-2 mb-5 text-xs md:text-sm text-[#a3c852]">
         <Zap className="w-4 h-4" />
-        <span className="font-medium">Resultado em 30 segundos</span>
+        <span className="font-medium">Resultado em menos de 30 segundos</span>
       </div>
 
       <button
@@ -362,7 +398,7 @@ export default function App() {
 
       <div className="mt-5 pt-5 border-t border-[#e2e8f0] flex items-center justify-center gap-2 text-xs md:text-sm text-[#64748b]">
         <Shield className="w-4 h-4 text-[#1C80B2]" />
-        <span>Usamos a base de dados dos tribunais do Paraná</span>
+        <span>Usamos a base de dados dos tribunais de todo Brasil</span>
       </div>
 
       {/* Testimonials inserted here */}
@@ -373,11 +409,20 @@ export default function App() {
   );
 
   const renderLoading = () => (
-    <div className="bg-white rounded-3xl p-10 md:p-12 shadow-xl flex flex-col items-center justify-center min-h-[400px] animate-in fade-in zoom-in duration-300">
+    <div className="bg-white rounded-3xl p-10 md:p-12 shadow-xl flex flex-col items-center justify-center min-h-[400px] animate-in fade-in zoom-in duration-300 w-full max-w-2xl mx-auto">
       <SkeletonResults />
-      <div className="mt-8 flex flex-col items-center gap-4">
+      <div className="mt-8 flex flex-col items-center gap-4 w-full px-8">
         <Loader2 className="size-12 text-[#1c80b2] animate-spin" />
         <p className="text-[#0f172a] font-bold text-xl animate-pulse text-center">{loadingText}</p>
+        
+        {/* Barra de Progresso Falsa */}
+        <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2 overflow-hidden">
+          <div 
+            className="bg-[#1c80b2] h-2.5 rounded-full transition-all duration-300 ease-out" 
+            style={{ width: `${Math.min(loadingProgress, 100)}%` }}
+          ></div>
+        </div>
+        <p className="text-xs text-gray-400 font-semibold">{Math.min(Math.round(loadingProgress), 100)}%</p>
       </div>
     </div>
   );
@@ -391,8 +436,8 @@ export default function App() {
     formData.email.includes('@') && 
     formData.email.includes('.') && 
     formData.whatsapp.replace(/\D/g, '').length >= 10 && 
-    selectedEstado && 
     formData.cidade && 
+    formData.estado && 
     formData.aceitaAdvogado;
 
   const handleUnlockAnalysis = async () => {
@@ -439,7 +484,7 @@ export default function App() {
   const renderResult = () => (
     <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-3xl mx-auto">
       {/* Probability Section with Blur */}
-      <div className={`bg-green-50 rounded-xl p-4 border border-green-200 mb-6 text-center transition-all duration-500 ${!isAnalysisUnlocked ? 'blur-md select-none opacity-80' : ''}`}>
+      <div className={`bg-green-50 rounded-xl p-4 border border-green-200 mb-6 text-center transition-all duration-500 ${!isAnalysisUnlocked ? 'blur-[8px] select-none opacity-100 pointer-events-none grayscale-[0.2]' : ''}`}>
         <h3 className="text-[#15803d] font-bold uppercase tracking-wider text-xs mb-2">Análise Concluída com Sucesso</h3>
         <GaugeChart percentage={resultData.probabilidade} />
         <p className="text-gray-500 text-xs mt-2">Baseado em {resultData.n_casos} casos similares</p>
@@ -456,33 +501,36 @@ export default function App() {
           <input placeholder="Nome Completo" className="form-input border border-gray-300 p-3 rounded-xl w-full focus:ring-2 focus:ring-[#8ab03d] outline-none" onChange={e => setFormData({ ...formData, nome: e.target.value })} />
           <input placeholder="E-mail" className="form-input border border-gray-300 p-3 rounded-xl w-full focus:ring-2 focus:ring-[#8ab03d] outline-none" onChange={e => setFormData({ ...formData, email: e.target.value })} />
           <input placeholder="WhatsApp / Celular" value={formData.whatsapp} maxLength={15} className="form-input border border-gray-300 p-3 rounded-xl w-full focus:ring-2 focus:ring-[#8ab03d] outline-none" onChange={e => setFormData({ ...formData, whatsapp: maskPhone(e.target.value) })} />
-          <div className="relative flex gap-2">
-            <div className="w-1/3">
-              <select
-                className="border border-gray-300 p-3 rounded-xl w-full outline-none focus:ring-2 focus:ring-[#8ab03d] bg-white text-gray-700 appearance-none"
-                value={selectedEstado}
-                onChange={e => setSelectedEstado(e.target.value)}
-              >
-                <option value="">UF</option>
-                {listaEstados.map((e) => <option key={e.sigla} value={e.sigla}>{e.sigla}</option>)}
-              </select>
-            </div>
-            <div className="w-2/3 relative">
-              <input
-                list="cities-list"
-                placeholder={selectedEstado ? "Digite a cidade..." : "Selecione estado"}
-                className="border border-gray-300 p-3 rounded-xl w-full outline-none focus:ring-2 focus:ring-[#8ab03d] disabled:bg-gray-100"
-                value={formData.cidade.split(' - ')[0]}
-                disabled={!selectedEstado}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFormData({ ...formData, cidade: `${val} - ${selectedEstado}` });
-                }}
-              />
-              <datalist id="cities-list">
-                {listaCidades.map((c, i) => <option key={i} value={c} />)}
-              </datalist>
-            </div>
+          
+          <div className="relative">
+            <input 
+              placeholder="CEP (Somente números)" 
+              maxLength={9}
+              className="form-input border border-gray-300 p-3 rounded-xl w-full focus:ring-2 focus:ring-[#8ab03d] outline-none"
+              value={formData.cep || ''}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                setFormData({ ...formData, cep: val });
+                if (val.length === 8) {
+                   fetch(`https://viacep.com.br/ws/${val}/json/`)
+                    .then(res => res.json())
+                    .then(data => {
+                      if (!data.erro) {
+                        setFormData(prev => ({ ...prev, cep: val, estado: data.uf, cidade: data.localidade }));
+                        setSelectedEstado(data.uf);
+                      } else {
+                        alert("CEP não encontrado.");
+                      }
+                    })
+                    .catch(() => alert("Erro ao buscar CEP."));
+                }
+              }}
+            />
+            {formData.cidade && (
+              <p className="text-xs text-green-600 mt-1 font-semibold flex items-center gap-1">
+                <CheckCircle className="size-3"/> {formData.cidade} - {formData.estado}
+              </p>
+            )}
           </div>
 
           <label className="flex items-start gap-3 cursor-pointer bg-gray-50 p-3 rounded-lg border border-gray-100">

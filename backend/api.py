@@ -9,6 +9,8 @@ import json
 import traceback
 import uuid
 import smtplib
+import psutil
+from datetime import datetime, timedelta
 from google import genai
 from google.genai import types
 import chromadb
@@ -454,6 +456,42 @@ def criar_pdf_bytes(dados_analise, nome_cliente):
 
 
 # --- ENDPOINTS ---
+
+@app.post("/api/transcrever")
+async def transcrever_audio(file: UploadFile = File(...)):
+    GOOGLE_KEY = os.getenv("GOOGLE_API_KEY")
+    if not GOOGLE_KEY:
+        raise HTTPException(status_code=500, detail="Chave da IA não configurada.")
+
+    logger.info(f"🎤 Recebendo áudio: {file.filename} ({file.content_type})")
+
+    try:
+        # Lê os bytes do arquivo enviado
+        audio_bytes = await file.read()
+        
+        # Instancia o cliente (idealmente global, mas aqui garante isolamento de config)
+        client = genai.Client(api_key=GOOGLE_KEY)
+
+        # Envia para o Gemini 2.0 Flash
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[
+                types.Part.from_bytes(data=audio_bytes, mime_type=file.content_type),
+                "Você é um assistente jurídico. Transcreva este áudio para texto em Português do Brasil. "
+                "Se houver gírias ou pausas, limpe o texto para que fique claro e formal, pronto para ser usado em um relato de caso. "
+                "Não adicione comentários, apenas o texto transcrito."
+            ]
+        )
+        
+        texto_transcrito = response.text
+        logger.info("✅ Transcrição concluída com sucesso.")
+        
+        return {"texto": texto_transcrito}
+
+    except Exception as e:
+        logger.error(f"❌ Erro na transcrição: {e}")
+        # Fallback genérico ou erro
+        raise HTTPException(status_code=500, detail="Falha ao processar áudio.")
 
 @app.post("/api/analisar")
 def analisar_caso(request: AnaliseRequest):
@@ -1304,6 +1342,216 @@ def admin_reenviar_email(req: AdminActionRequest, background_tasks: BackgroundTa
     background_tasks.add_task(processar_aprovacao_manual_background, req.id_analise)
 
     return {"status": "ok", "mensagem": "E-mail será reenviado em instantes."}
+
+@app.get("/api/admin/logs")
+def get_activity_logs(limit: int = 50):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500)
+    
+    try:
+        # Corrigido nomes das colunas: timestamp em vez de created_at, status em vez de level
+        query = """
+            SELECT id, timestamp as created_at, status as level, action, details 
+            FROM activity_logs 
+            ORDER BY timestamp DESC 
+            LIMIT %s
+        """
+        # Se details for JSONB, pandas pode trazer como dict, precisamos garantir serialização se for complexo
+        df = pd.read_sql_query(query, conn, params=(limit,))
+        
+        # Converte timestamp para string ISO
+        if not df.empty:
+            df['created_at'] = df['created_at'].astype(str)
+            # Converte details (JSONB) para string se for dict
+            df['details'] = df['details'].apply(lambda x: json.dumps(x) if isinstance(x, (dict, list)) else str(x))
+
+        return df.fillna("").to_dict(orient="records")
+    except Exception as e:
+        logger.error(f"Erro ao buscar logs: {e}")
+        return []
+    finally:
+        release_db_connection(conn)
+
+@app.get("/api/admin/tasks")
+def get_scheduled_tasks(limit: int = 50):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500)
+    
+    try:
+        # Corrigido conforme schema real: task_name, active (para status), sem results
+        query = """
+            SELECT id, task_name, 
+                   CASE WHEN active THEN 'active' ELSE 'disabled' END as status,
+                   last_run as last_run_at, 
+                   next_run as next_run_at, 
+                   '' as result 
+            FROM scheduled_tasks 
+            ORDER BY next_run ASC 
+            LIMIT %s
+        """
+        df = pd.read_sql_query(query, conn, params=(limit,))
+        
+        if not df.empty:
+            df['last_run_at'] = df['last_run_at'].astype(str).replace('NaT', '')
+            df['next_run_at'] = df['next_run_at'].astype(str).replace('NaT', '')
+
+        return df.fillna("").to_dict(orient="records")
+    except Exception as e:
+        logger.error(f"Erro ao buscar tasks: {e}")
+        return []
+    finally:
+        release_db_connection(conn)
+
+@app.get("/api/admin/metrics")
+def get_system_metrics():
+    try:
+        # 1. System Usage
+        cpu_usage = psutil.cpu_percent(interval=None)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        # 2. Application Cache
+        cache_size = len(ANALISES_CACHE)
+        cache_max = ANALISES_CACHE.maxsize
+        
+        # 3. DB Connections
+        db_pool_status = "N/A"
+        try:
+            if pg_pool and not pg_pool.closed:
+                db_pool_status = "Active"
+            else:
+                db_pool_status = "Closed"
+        except: pass
+
+        # --- PERSISTÊNCIA 30 MIN ---
+        conn = get_db_connection()
+        history = []
+        if conn:
+            try:
+                with conn.cursor() as cur:
+                    # Verifica última e salva se necessário
+                    cur.execute("SELECT created_at FROM system_metrics ORDER BY id DESC LIMIT 1")
+                    last = cur.fetchone()
+                    
+                    from datetime import datetime, timedelta
+                    salvar = False
+                    if not last:
+                        salvar = True
+                    else:
+                        diff = datetime.now() - last[0]
+                        if diff.total_seconds() > 1800: # 30 min
+                            salvar = True
+                    
+                    if salvar:
+                        cur.execute("""
+                            INSERT INTO system_metrics (cpu_percent, memory_percent, disk_percent, cache_items, created_at)
+                            VALUES (%s, %s, %s, %s, NOW())
+                        """, (cpu_usage, memory.percent, disk.percent, cache_size))
+                        conn.commit()
+                    
+                    # Recupera histórico para o gráfico (últimas 24h ~ 48 pontos)
+                    cur.execute("SELECT created_at, cpu_percent, memory_percent, disk_percent, cache_items FROM system_metrics ORDER BY created_at ASC LIMIT 50")
+                    rows = cur.fetchall()
+                    for r in rows:
+                        history.append({
+                            "time": r[0].strftime("%H:%M"),
+                            "cpu": r[1],
+                            "memory": r[2],
+                            "disk": r[3],
+                            "cache": r[4]
+                        })
+            except Exception as e:
+                logger.error(f"Erro DB metrics history: {e}")
+            finally:
+                release_db_connection(conn)
+
+        return {
+            "system": {
+                "cpu": cpu_usage,
+                "memory_percent": memory.percent,
+                "memory_used_gb": round(memory.used / (1024**3), 2),
+                "memory_total_gb": round(memory.total / (1024**3), 2),
+                "disk_percent": disk.percent,
+                "disk_free_gb": round(disk.free / (1024**3), 2)
+            },
+            "application": {
+                "cache_items": cache_size,
+                "cache_max": cache_max,
+                "db_pool": db_pool_status
+            },
+            "history": history
+        }
+    except Exception as e:
+        logger.error(f"Error metrics: {e}")
+        traceback.print_exc()
+        return {}
+
+@app.get("/api/admin/analytics")
+def get_business_analytics():
+    """
+    Retorna métricas de negócio para gráficos:
+    1. Análises Diárias (Leads criados por dia nos últimos 7 dias)
+    2. Acessos Diários (Dados reais do Clarity salvos em daily_metrics)
+    """
+    history = []
+    
+    conn = get_db_connection()
+    if not conn: return {"history": []}
+    
+    try:
+        with conn.cursor() as cur:
+            # Busca da tabela consolidada daily_metrics
+            cur.execute("""
+                SELECT TO_CHAR(date, 'DD/MM') as dia, leads_count, clarity_views
+                FROM daily_metrics
+                WHERE date > CURRENT_DATE - INTERVAL '7 days'
+                ORDER BY date ASC
+            """)
+            rows = cur.fetchall()
+            
+            # Se não houver dados consolidados (primeiros dias), faz fallback para leads count real
+            # mas clarity será 0.
+            if not rows:
+                cur.execute("""
+                    SELECT TO_CHAR(data_registro, 'DD/MM') as dia, COUNT(*) as total 
+                    FROM leads 
+                    WHERE data_registro > NOW() - INTERVAL '7 days'
+                    GROUP BY 1 
+                    ORDER BY MIN(data_registro) ASC
+                """)
+                rows_leads = cur.fetchall()
+                for r in rows_leads:
+                    history.append({
+                        "date": r[0],
+                        "analyses": r[1],
+                        "accesses": 0 
+                    })
+            else:
+                for r in rows:
+                    history.append({
+                        "date": r[0],
+                        "analyses": r[1],
+                        "accesses": r[2]
+                    })
+                
+    except Exception as e:
+        logger.error(f"Erro analytics: {e}")
+    finally:
+        release_db_connection(conn)
+        
+    return {"history": history}
+
+@app.get("/api/admin/roadmap")
+def get_roadmap():
+    try:
+        roadmap_path = Path("/var/www/indeniza/Roadmap.md")
+        if roadmap_path.exists():
+            content = roadmap_path.read_text(encoding="utf-8")
+            return {"content": content}
+        return {"content": "# Roadmap não encontrado."}
+    except Exception as e:
+        logger.error(f"Erro ao ler roadmap: {e}")
+        return {"content": "Erro ao carregar roadmap."}
 
 @app.post("/api/admin/aprovar_manual")
 def admin_aprovar_manual(req: AdminActionRequest, background_tasks: BackgroundTasks):
