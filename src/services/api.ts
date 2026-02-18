@@ -48,6 +48,21 @@ export const api = {
         }
     },
 
+    transcrever: async (file: File) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        const response = await fetch(`${API_URL}/transcrever`, {
+            method: 'POST',
+            body: formData, // fetch sets content-type automatically for FormData
+        });
+        
+        if (!response.ok) {
+            throw new Error("Erro na transcrição");
+        }
+        return await response.json();
+    },
+
     getRelatorio: async (id: string) => {
         const { data } = await axiosInstance.get(`/relatorio/${id}`);
         return data;

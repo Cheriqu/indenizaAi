@@ -47,6 +47,8 @@ import Testimonials from "@/app/components/Testimonials";
 import { maskPhone } from "@/utils/maskPhone";
 import { api, loadStates, loadCitiesByState } from "@/services/api";
 import { Footer } from "@/app/components/Footer";
+import AudioRecorder from "@/app/components/AudioRecorder"; // Importar componente
+import { trackEvent, trackError, tagSession } from "@/utils/clarity";
 
 export default function App() {
   // STATE: Flow Control
@@ -68,6 +70,9 @@ export default function App() {
   // STATE: Payment Polling
   const [aguardandoPagamento, setAguardandoPagamento] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // STATE: UTM Tracking
+  const [utms, setUtms] = useState({ source: '', medium: '', campaign: '', content: '', term: '' });
 
   // STATE: History
   const [historico, setHistorico] = useState<string[]>([]);
@@ -101,6 +106,29 @@ export default function App() {
 
     // Initial Load - States
     loadStates().then(setListaEstados);
+
+    // CAPTURE UTMs
+    const params = new URLSearchParams(window.location.search);
+    const capturedUtms = {
+      source: params.get('utm_source') || '',
+      medium: params.get('utm_medium') || '',
+      campaign: params.get('utm_campaign') || '',
+      content: params.get('utm_content') || '',
+      term: params.get('utm_term') || ''
+    };
+    if (Object.values(capturedUtms).some(val => val)) {
+      setUtms(capturedUtms);
+      // Persist in Session Storage for reload resilience
+      sessionStorage.setItem('indeniza_utms', JSON.stringify(capturedUtms));
+      
+      // Track source in Clarity
+      if (capturedUtms.source) tagSession("utm_source", capturedUtms.source);
+      if (capturedUtms.campaign) tagSession("utm_campaign", capturedUtms.campaign);
+    } else {
+      // Try to recover from session storage
+      const saved = sessionStorage.getItem('indeniza_utms');
+      if (saved) setUtms(JSON.parse(saved));
+    }
 
     // Check for Recovery Link
     const urlParams = new URLSearchParams(window.location.search);
@@ -137,8 +165,11 @@ export default function App() {
     }
   }, [selectedEstado]);
 
-  // TRACKING: Dispara Purchase quando o pagamento é confirmado
+  // TRACKING: Dispara Purchase quando o pagamento é confirmado e rastreia passos
   useEffect(() => {
+    // Rastreia o passo atual
+    tagSession("current_step", step);
+    
     if (step === 'SUCCESS') {
       // @ts-ignore
       if (window.fbq) {
@@ -150,11 +181,8 @@ export default function App() {
           content_type: 'product'
         });
       }
-      // @ts-ignore
-      if (window.clarity) {
-        // @ts-ignore
-        window.clarity('set', 'conversion', 'purchase');
-      }
+      tagSession("conversion", "purchase");
+      trackEvent("purchase_success");
     }
   }, [step]);
 
@@ -236,18 +264,23 @@ export default function App() {
   // --- ACTIONS ---
 
   const handleAnalyze = async () => {
-    if (inputValue.length < 30) return alert("Por favor, descreva melhor o caso com pelo menos 30 caracteres.");
+    if (inputValue.length < 10) {
+      trackEvent("error_input_too_short");
+      return alert("Por favor, descreva melhor o caso.");
+    }
     setStep('LOADING');
     setIsAnalysisUnlocked(false); // RESET: Força o bloqueio para a nova análise exigir salvamento
     try {
       const data = await api.analyze(inputValue);
       setResultData(data);
       setAnaliseId(data.id_analise);
+      trackEvent("analysis_completed");
       setStep('RESULT');
       // Clarity Event: View Result
       // @ts-ignore
       if (window.clarity) window.clarity('event', 'view_result');
     } catch (error: any) {
+      trackError("analysis_failed", error.message || "Unknown");
       if (error.response?.status === 429) {
         alert("Ops! Parece que você fez muitas consultas hoje. Tente novamente amanhã.");
       } else {
@@ -258,22 +291,35 @@ export default function App() {
   };
 
   const handlePayment = async () => {
-    if (!formData.nome || !formData.email) return alert("Preencha seus dados para continuar.");
-    if (!formData.aceitaAdvogado) return alert("Por favor, aceite o termo de contato para continuar.");
+    if (!formData.nome || !formData.email) {
+      trackEvent("payment_form_incomplete");
+      return alert("Preencha seus dados para continuar.");
+    }
+    if (!formData.aceitaAdvogado) {
+      trackEvent("payment_terms_not_accepted");
+      return alert("Por favor, aceite o termo de contato para continuar.");
+    }
 
     // Clarity Event: Payment Click
     // @ts-ignore
     if (window.clarity) window.clarity('event', 'payment_click');
 
     setAguardandoPagamento(true);
+    trackEvent("payment_initiated");
+    
     try {
       const payload = {
         ...formData, resumo: inputValue, categoria: resultData.categoria,
-        prob: resultData.probabilidade, valor: resultData.valor_estimado, aceita_advogado: formData.aceitaAdvogado, id_analise: analiseId
+        prob: resultData.probabilidade, valor: resultData.valor_estimado, aceita_advogado: formData.aceitaAdvogado, id_analise: analiseId,
+        utm_source: utms.source, utm_medium: utms.medium, utm_campaign: utms.campaign, utm_content: utms.content, utm_term: utms.term
       };
       const data = await api.pagar(payload);
-      if (data.link) window.open(data.link, '_blank');
-    } catch (error) {
+      if (data.link) {
+        trackEvent("payment_link_opened");
+        window.open(data.link, '_blank');
+      }
+    } catch (error: any) {
+      trackError("payment_generation_failed", error.message || "Unknown");
       alert("Erro ao gerar pagamento.");
       setAguardandoPagamento(false);
     }
@@ -343,10 +389,15 @@ export default function App() {
   const renderInputForm = () => (
     <div className="form-card bg-white rounded-3xl p-6 md:p-8 shadow-xl relative animate-in fade-in zoom-in duration-300">
       <div className="mb-5">
-        <label className="block text-sm md:text-base font-semibold text-[#0f172a] mb-2 flex justify-between items-center">
-          Conte o que aconteceu com você:
-          <span className={`text-xs ${inputValue.length > 50 ? 'text-green-500' : 'text-gray-400'}`}>{inputValue.length}/5000 caracteres</span>
-        </label>
+        <div className="flex justify-between items-center mb-2">
+          <label className="block text-sm md:text-base font-semibold text-[#0f172a]">
+            Conte o que aconteceu com você:
+          </label>
+          <div className="flex items-center gap-2">
+            <AudioRecorder onTranscription={(txt) => setInputValue(txt)} />
+            <span className={`text-xs ${inputValue.length > 50 ? 'text-green-500' : 'text-gray-400'}`}>{inputValue.length}/5000 chars</span>
+          </div>
+        </div>
         <textarea
           className="form-input w-full min-h-[120px] bg-white border border-[#e2e8f0] rounded-xl px-4 py-3 text-sm md:text-base text-[#0f172a] resize-none transition-all duration-300 focus:outline-none focus:border-[#1c80b2] focus:ring-2 focus:ring-[#1c80b2]/20 shadow-inner"
           placeholder="Ex: Meu voo foi cancelado sem aviso prévio, descobri um empréstimo no meu nome que não fiz, fui cobrado por taxas bancárias abusivas..."
@@ -414,9 +465,14 @@ export default function App() {
     formData.aceitaAdvogado;
 
   const handleUnlockAnalysis = async () => {
-    if (!isFormValid) return alert("Por favor, preencha todos os campos para ver o resultado.");
+    if (!isFormValid) {
+      trackEvent("unlock_form_invalid");
+      return alert("Por favor, preencha todos os campos para ver o resultado.");
+    }
 
     setIsSaving(true);
+    trackEvent("unlock_analysis_attempt");
+
     try {
       const payload = {
         nome: formData.nome,
@@ -441,8 +497,10 @@ export default function App() {
       if (window.clarity) window.clarity('event', 'unlock_click');
       await api.saveLead(payload);
       setIsAnalysisUnlocked(true);
-    } catch (error) {
+      trackEvent("lead_captured_success");
+    } catch (error: any) {
       console.error(error);
+      trackError("lead_save_failed", error.message || "Unknown");
       alert("Erro ao salvar contato. Tente novamente.");
     } finally {
       setIsSaving(false);

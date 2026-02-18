@@ -21,14 +21,32 @@ O foco total esta semana é **Estabilidade e Observabilidade** para suportar o a
 - [x] **Rate Limiting:** Proteção contra abuso de API (FastAPI Middleware, 100/dia/IP).
 - [x] **Monitoramento de Erros:** Configurado Sentry para alertas em tempo real.
 
+### 💻 Frontend & UX
+- [x] **Correção de Fluxo:** "Nova Análise" funciona corretamente.
+- [x] **Validação de Formulário:** Bloqueio de envio com campos vazios.
+- [x] **Link de Recuperação:** Suporte a `?recover=UUID`.
+- [x] **Entrada de Áudio (Voz):** Suporte a relatos por voz (transcrição via Google Gemini).
+
 ---
 
 ## ✅ Entregas Recentes (Concluído)
+
+### 📈 Relatório de Funil & Rastreamento de Anúncios (Prioridade Alta - Anúncios Quarta-feira)
+**Objetivo:** Monitorar ROI e conversão detalhada por criativo/copy para os anúncios que iniciam dia 18/02.
+1.  **Rastreamento de Origem (UTMs):**
+    -   [x] **Frontend:** Capturar `utm_source`, `utm_medium`, `utm_campaign`, `utm_content` da URL e persistir. Enviar junto com o cadastro do lead.
+    -   [x] **Backend:** Adicionar colunas de UTM na tabela `leads` e salvar a origem de cada usuário.
+2.  **Relatório de Funil Diário:**
+    -   [x] **Integração Clarity:** Refinado rastreamento de erros e conversão com tags personalizadas e eventos de validação.
+    -   [ ] **Agregação:** Criar rotina que compila: Sessões (Clarity) -> Leads (DB) -> Vendas (DB).
+    -   [ ] **Conversão por Anúncio:** Detalhar Leads e Vendas agrupados por `utm_content` (identificador do anúncio/criativo) e `utm_campaign`.
+    -   [ ] **Envio Automático:** Enviar este resumo diariamente (E-mail/Telegram) para o Luiz.
 
 ### 🏗️ Backend & Banco de Dados
 - [x] **PostgreSQL:** Migração completa do SQLite para Postgres com Connection Pooling.
 - [x] **Recuperação de Carrinho:** Robô automático envia e-mails para leads que não compraram.
 - [x] **Webhook Mercado Pago:** Processamento assíncrono de pagamentos aprovados.
+
 
 ### 💻 Frontend & Experiência
 - [x] **Nova Identidade Visual:** Interface limpa e responsiva.
