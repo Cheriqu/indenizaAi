@@ -224,14 +224,11 @@ class LeadData(BaseModel):
     aceita_advogado: bool
     id_analise: str
     utm_source: str | None = None
-<<<<<<< HEAD
-    utm_campaign: str | None = None
-=======
+    utm_source: str | None = None
     utm_medium: str | None = None
     utm_campaign: str | None = None
     utm_content: str | None = None
     utm_term: str | None = None
->>>>>>> 81f7e67d647973a6ad0f51ba72b014c751f7796e
 
     class Config:
         extra = "ignore"
@@ -719,18 +716,8 @@ def salvar_lead(lead: LeadData):
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM leads WHERE id_analise = %s", (lead.id_analise,))
             if cur.fetchone():
-<<<<<<< HEAD
-                cur.execute("UPDATE leads SET nome=%s, email=%s, whatsapp=%s, cidade=%s, utm_source=%s, utm_campaign=%s WHERE id_analise=%s",
-                          (lead.nome, lead.email, lead.whatsapp, cidade_completa, lead.utm_source, lead.utm_campaign, lead.id_analise))
-            else:
-                cur.execute("""
-                    INSERT INTO leads (nome, email, whatsapp, cidade, resumo_caso, categoria, probabilidade, valor_estimado, id_analise, utm_source, utm_campaign) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (lead.nome, lead.email, lead.whatsapp, cidade_completa, lead.resumo, lead.categoria, lead.prob, lead.valor, lead.id_analise, lead.utm_source, lead.utm_campaign))
-=======
-                # Atualiza dados principais (UTMs geralmente não mudam, mas poderíamos atualizar se quiséssemos)
-                cur.execute("UPDATE leads SET nome=%s, email=%s, whatsapp=%s, cidade=%s WHERE id_analise=%s",
-                          (lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.id_analise))
+                cur.execute("UPDATE leads SET nome=%s, email=%s, whatsapp=%s, cidade=%s, utm_source=%s, utm_medium=%s, utm_campaign=%s, utm_content=%s, utm_term=%s WHERE id_analise=%s",
+                          (lead.nome, lead.email, lead.whatsapp, cidade_completa, lead.utm_source, lead.utm_medium, lead.utm_campaign, lead.utm_content, lead.utm_term, lead.id_analise))
             else:
                 cur.execute("""
                     INSERT INTO leads (
@@ -740,11 +727,10 @@ def salvar_lead(lead: LeadData):
                     ) 
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
-                    lead.nome, lead.email, lead.whatsapp, lead.cidade, lead.resumo, lead.categoria, 
+                    lead.nome, lead.email, lead.whatsapp, cidade_completa, lead.resumo, lead.categoria, 
                     lead.prob, lead.valor, lead.id_analise,
                     lead.utm_source, lead.utm_medium, lead.utm_campaign, lead.utm_content, lead.utm_term
                 ))
->>>>>>> 81f7e67d647973a6ad0f51ba72b014c751f7796e
         conn.commit()
     except Exception as e:
         if conn: conn.rollback()

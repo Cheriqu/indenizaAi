@@ -1,103 +1,59 @@
-# ⚖️ IndenizaAi - Plataforma de Jurimetria Automatizada
+# ⚖️ Indeniza.ai - LegalTech com Inteligência Artificial
 
-O **IndenizaAi** é uma LegalTech que utiliza Inteligência Artificial para analisar casos cotidianos (voo cancelado, nome negativado, etc.) e estimar a probabilidade de êxito e valor de indenização com base na jurisprudência do TJPR.
-
----
-
-## 🛠️ Stack Tecnológica
-
-### Backend (`/backend`)
-*   **Linguagem:** Python 3.12+
-*   **Framework:** FastAPI (High Performance)
-*   **Banco de Dados:** PostgreSQL (Dados relacionais)
-*   **Vector DB:** ChromaDB (Busca semântica de jurisprudência)
-*   **AI:** Google Gemini (Análise de contexto e classificação)
-*   **Tasks:** BackgroundTasks (Async) + Cron Jobs (Recuperação) + System Metrics
-*   **Libs Principais:** `psycopg2`, `sentence-transformers`, `uvicorn`, `mercadopago`.
-
-### Frontend (`/src`)
-*   **Framework:** React 18 + Vite
-*   **Estilização:** TailwindCSS
-*   **Deploy:** Build estático servido por Nginx/Apache.
+> **Nota:** Este projeto foi desenvolvido como um case de portfólio para demonstrar competências em Engenharia de Software, Arquitetura de Sistemas e Engenharia de IA.
 
 ---
 
-## 🚀 Instalação e Configuração
+## 🚀 Sobre o Projeto
 
-### 1. Pré-requisitos
-*   Python 3.12+
-*   Node.js 20+
-*   PostgreSQL 14+
+O **Indeniza.ai** é uma plataforma SaaS (Software as a Service) focada em **Jurimetria e Acesso à Justiça**. A aplicação resolve um problema comum: a incerteza das pessoas sobre seus direitos em casos de danos morais e materiais (ex: voos cancelados, negativação indevida, problemas bancários).
 
-### 2. Backend Setup
+Utilizando **GenAI (IA Generativa)** e **Busca Vetorial (RAG)**, o sistema analisa o relato do usuário em linguagem natural, compara com milhares de decisões reais dos tribunais e entrega um relatório instantâneo com a probabilidade de êxito e estimativa de valor da causa.
 
-```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+## 🧠 Arquitetura e Inteligência Artificial
 
-# Configurar Variáveis de Ambiente
-cp .env.example .env
-# Edite o .env com as credenciais do PostgreSQL, Brevo, Google AI e Mercado Pago.
-```
+O diferencial técnico do projeto reside na sua pipeline de dados e inferência:
 
-### 3. Banco de Dados
-```bash
-# Crie o banco e usuário no Postgres
-sudo -u postgres psql -c "CREATE USER indeniza WITH PASSWORD 'sua_senha';"
-sudo -u postgres psql -c "CREATE DATABASE indeniza_db OWNER indeniza;"
+1.  **Input Natural:** O usuário relata o caso (texto ou áudio).
+2.  **Classificação & Estruturação (LLM):** Utilizamos **Google Gemini** para entender o contexto, extrair entidades e classificar a categoria jurídica.
+3.  **Vector Search (RAG):** O relato é convertido em *embeddings* e comparado semanticamente com uma base de dados vetorial (**ChromaDB**) contendo jurisprudência real do TJPR.
+4.  **Cálculo Jurimétrico:** Algoritmos proprietários cruzam os dados da IA com os precedentes encontrados para calcular a probabilidade de vitória.
 
-# A tabela 'leads' será criada automaticamente ao iniciar a API.
-```
+## 🛠️ Stack Tecnológico
 
-### 4. Executando
-```bash
-# Backend (Porta 8000)
-cd backend
-./venv/bin/uvicorn api:app --host 0.0.0.0 --port 8000
+O projeto foi construído utilizando uma arquitetura moderna, escalável e segura.
 
-# Frontend (Porta 5173 ou Build)
-cd ..
-npm install
-npm run dev # ou npm run build
-```
+### Frontend (SPA)
+-   **Framework:** React + Vite
+-   **Linguagem:** TypeScript
+-   **Estilização:** Tailwind CSS (Responsividade e UI moderna)
+-   **Analytics:** Integração avançada com Microsoft Clarity (Session Replay) e Google Analytics 4 (Eventos Personalizados).
 
----
+### Backend (API REST)
+-   **Framework:** FastAPI (Python) - Alta performance assíncrona.
+-   **Banco de Dados Relacional:** PostgreSQL (Gerenciamento de Leads, Transações e Logs).
+-   **Banco de Dados Vetorial:** ChromaDB (Armazenamento de Embeddings Jurídicos).
+-   **Tasks Assíncronas:** Processamento de pagamentos e envios de e-mail em background.
 
-## ⚙️ Funcionalidades Críticas
+### Infraestrutura & DevOps
+-   **Servidor:** VPS Linux (Ubuntu).
+-   **Servidor Web:** Nginx (Reverse Proxy e SSL).
+-   **Gerenciamento de Processos:** Systemd.
+-   **Monitoramento:** Painel "Mission Control" próprio para métricas de CPU/RAM e KPIs de negócio em tempo real.
 
-### 💳 Webhook de Pagamento
-O endpoint `/api/webhook` processa pagamentos do Mercado Pago de forma **assíncrona**.
-1.  Recebe notificação `payment.created`.
-2.  Responde `200 OK` imediatamente.
-3.  Em background: Valida pagamento -> Gera PDF -> Envia E-mail (Brevo).
+## ✨ Funcionalidades Principais
 
-### 🔄 Recuperação de Carrinho
-Um script (`backend/recovery.py`) roda via **Cron** a cada 1 hora.
-*   Busca leads criados há >1h que não pagaram.
-*   Envia e-mail único com link de recuperação (`?recover=UUID`).
-*   O frontend restaura a sessão e permite pagamento direto.
+-   **Análise Gratuita via IA:** Feedback imediato sobre a viabilidade do processo.
+-   **Entrada de Voz:** Transcrição de áudio para texto integrada.
+-   **Geração de PDF:** Criação dinâmica de relatórios detalhados com ReportLab.
+-   **Checkout Transparente:** Integração completa com **Mercado Pago** (PIX/Cartão).
+-   **Rastreamento de Marketing:** Sistema robusto de UTMs para atribuição de conversão por campanha/anúncio.
+-   **Painel Administrativo:** Dashboard completo para gestão de leads e visualização de métricas do servidor.
 
-### 📊 Mission Control
-Painel administrativo para:
-*   Visualizar KPIs (Conversão, Faturamento).
-*   Visualizar métricas do sistema (CPU, Memória, Disco).
-*   Exportar CSV de leads.
-*   Reenviar e-mails de clientes manualmente.
-*   Aprovar pagamentos manualmente.
+## 📱 Status do Projeto
+
+O projeto encontra-se em produção, processando leads reais e servindo como base para automação de triagem jurídica.
 
 ---
 
-## 📂 Estrutura de Pastas
-*   `backend/`: Código Python, API, Scripts.
-    *   `api.py`: Aplicação principal.
-    *   `recovery.py`: Script de automação.
-    *   `chroma_db/`: Banco vetorial (persistente).
-*   `src/`: Código React.
-    *   `app/components/MissionControl.tsx`: Dashboard com Histórico do Sistema.
-*   `dist/`: Build de produção do frontend.
-
----
-
-**© 2026 IndenizaAi** - Desenvolvido por Claw.
+Desenvolvido por **Luiz Cherique**.
